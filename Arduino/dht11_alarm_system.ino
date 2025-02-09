@@ -8,8 +8,8 @@
 #define GREEN_LED_PIN 25     // GPIO 25 for Green LED (Normal)
 
 // Thresholds for Alarm System
-#define TEMP_THRESHOLD 30   // High Temperature threshold in °C
-#define HUMIDITY_THRESHOLD 40 // Low Humidity threshold in %
+#define TEMP_THRESHOLD 35 // High Temperature threshold in °C
+#define HUMIDITY_THRESHOLD 20 // Low Humidity threshold in %
 
 DHT dht(DHTPIN, DHTTYPE);  // Initialize DHT sensor
 

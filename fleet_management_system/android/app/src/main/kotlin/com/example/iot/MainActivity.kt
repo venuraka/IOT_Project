@@ -1,4 +1,4 @@
-package com.example.fleet_management_system
+package com.example.iot
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -3,38 +3,25 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'speed.dart';
+import 'obd_calculations.dart';
 
-void main() {
-  runApp(MyApp());
-}
-
-class MyApp extends StatelessWidget {
+class SpeedPage extends StatefulWidget {
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'OBD-II App',
-      home: OBDIIPage(),
-      routes: {
-        '/speed': (context) => SpeedPage(),
-      },
-    );
-  }
+  _SpeedPageState createState() => _SpeedPageState();
 }
 
-class OBDIIPage extends StatefulWidget {
-  @override
-  _OBDIIPageState createState() => _OBDIIPageState();
-}
-
-class _OBDIIPageState extends State<OBDIIPage> {
+class _SpeedPageState extends State<SpeedPage> {
   BluetoothConnection? connection;
   bool isConnecting = true;
   bool isConnected = false;
   String responseText = "Connecting...";
-  String engineRPM = "N/A";
-  Timer? rpmTimer;
+  String vehicleSpeed = "N/A";
+  String acceleration = "N/A";
+  String deceleration = "N/A";
+  Timer? speedTimer;
+
+  double? previousSpeed;
+  DateTime? previousTime;
 
   String obdDeviceAddress = "01:23:45:67:89:BA"; // Replace with your ELM327 MAC address
 
@@ -49,22 +36,6 @@ class _OBDIIPageState extends State<OBDIIPage> {
       isConnecting = true;
       responseText = "Connecting...";
     });
-
-    Map<Permission, PermissionStatus> statuses = await [
-      Permission.bluetoothConnect,
-      Permission.bluetoothScan,
-      Permission.locationWhenInUse,
-    ].request();
-
-    if (statuses[Permission.bluetoothConnect] != PermissionStatus.granted ||
-        statuses[Permission.bluetoothScan] != PermissionStatus.granted ||
-        statuses[Permission.locationWhenInUse] != PermissionStatus.granted) {
-      setState(() {
-        responseText = "Bluetooth or Location permissions denied!";
-        isConnecting = false;
-      });
-      return;
-    }
 
     try {
       List<BluetoothDevice> devices = await FlutterBluetoothSerial.instance.getBondedDevices();
@@ -93,7 +64,7 @@ class _OBDIIPageState extends State<OBDIIPage> {
 
         print("Connected to OBD-II");
         startListening();
-        startRPMUpdates();
+        startSpeedUpdates();
       }).catchError((error) {
         setState(() {
           responseText = "Connection failed!";
@@ -111,11 +82,11 @@ class _OBDIIPageState extends State<OBDIIPage> {
     }
   }
 
-  void startRPMUpdates() {
-    rpmTimer?.cancel();
-    rpmTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
+  void startSpeedUpdates() {
+    speedTimer?.cancel();
+    speedTimer = Timer.periodic(Duration(milliseconds: 500), (timer) {
       if (isConnected) {
-        sendOBDCommand("010C");
+        sendOBDCommand("010D");
       } else {
         timer.cancel();
       }
@@ -128,7 +99,7 @@ class _OBDIIPageState extends State<OBDIIPage> {
     connection!.input!.listen((Uint8List data) {
       String rawResponse = utf8.decode(data);
       print("Raw OBD Response: $rawResponse");
-      parseEngineRPMResponse(rawResponse);
+      parseSpeedResponse(rawResponse);
     });
   }
 
@@ -145,28 +116,34 @@ class _OBDIIPageState extends State<OBDIIPage> {
     await connection!.output.allSent;
   }
 
-  void parseEngineRPMResponse(String response) {
-    if (!response.contains("41 0C")) return;
+  void parseSpeedResponse(String response) {
+    if (!response.contains("41 0D")) return;
 
     List<String> hexValues = response.trim().split(" ");
-    if (hexValues.length < 4) return;
+    if (hexValues.length < 3) return;
 
     try {
-      int rpmValue = ((int.parse(hexValues[2], radix: 16) * 256) +
-          int.parse(hexValues[3], radix: 16)) ~/
-          4;
+      int speedValue = int.parse(hexValues[2], radix: 16);
+      DateTime currentTime = DateTime.now();
+
+      double accelerationValue = calculateAcceleration(previousSpeed, speedValue.toDouble(), previousTime, currentTime);
+      double decelerationValue = calculateDeceleration(previousSpeed, speedValue.toDouble(), previousTime, currentTime);
 
       setState(() {
-        engineRPM = "$rpmValue RPM";
+        vehicleSpeed = "$speedValue km/h";
+        acceleration = "${accelerationValue.toStringAsFixed(2)} m/s²";
+        deceleration = "${decelerationValue.toStringAsFixed(2)} m/s²";
+        previousSpeed = speedValue.toDouble();
+        previousTime = currentTime;
       });
     } catch (e) {
-      print("Error parsing RPM: $e");
+      print("Error parsing speed: $e");
     }
   }
 
   @override
   void dispose() {
-    rpmTimer?.cancel();
+    speedTimer?.cancel();
     connection?.dispose();
     super.dispose();
   }
@@ -174,9 +151,18 @@ class _OBDIIPageState extends State<OBDIIPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("OBD-II Engine RPM")),
+      appBar: AppBar(title: Text("OBD-II Vehicle Speed")),
       body: Center(
-        child: Column(
+        child: isConnecting
+            ? Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 20),
+            Text("Connecting to OBD-II...", style: TextStyle(fontSize: 18)),
+          ],
+        )
+            : Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
@@ -190,14 +176,14 @@ class _OBDIIPageState extends State<OBDIIPage> {
             SizedBox(height: 20),
             Text(responseText, style: TextStyle(fontSize: 18)),
             SizedBox(height: 20),
-            Text("Engine RPM: $engineRPM", style: TextStyle(fontSize: 24)),
+            Text("Vehicle Speed: $vehicleSpeed",
+                style: TextStyle(fontSize: 24)),
             SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pushNamed(context, '/speed');
-              },
-              child: Text("Go to Speed Page"),
-            ),
+            Text("Acceleration: $acceleration",
+                style: TextStyle(fontSize: 24, color: Colors.green)),
+            SizedBox(height: 20),
+            Text("Deceleration: $deceleration",
+                style: TextStyle(fontSize: 24, color: Colors.blue)),
           ],
         ),
       ),

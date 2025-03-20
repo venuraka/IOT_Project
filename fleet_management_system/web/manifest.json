@@ -1,6 +1,6 @@
 {
-    "name": "fleet_management_system",
-    "short_name": "fleet_management_system",
+    "name": "iot",
+    "short_name": "iot",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -1,4 +1,8 @@
+import 'package:dashboard/dashboard.dart';
+import 'package:dashboard/map.dart';
 import 'package:flutter/material.dart';
+import 'profile.dart';   
+import 'info.dart';     
 
 void main() {
   runApp(const MyApp());
@@ -11,56 +15,65 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
-      home: const HomePage(),
+      home: const HomeScreen(),
     );
   }
 }
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  // ignore: library_private_types_in_public_api
+  _HomeScreenState createState() => _HomeScreenState();
 }
 
-class _HomePageState extends State<HomePage> {
-  int currentIndex = 0;
+class _HomeScreenState extends State<HomeScreen> {
+  int _selectedIndex = 0; // Default selected index (profile)
 
-  final List<Widget> pages = const [
-    HomePage(),
+  final List<Widget> _pages = [
+    Dashboard(),
+    MapScreen(),
+    VehicleInfo(),
+    Profile(),
   ];
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 500),
-        transitionBuilder: (widget, animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: widget,
-          );
-        },
-        child: pages[currentIndex],
-      ),
+      backgroundColor: Colors.white,
+      body: _pages[_selectedIndex], // Display selected page
+
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: currentIndex,
-        onTap: (index) {
-          setState(() {
-            currentIndex = index;
-          });
-        },
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        selectedItemColor: const Color.fromARGB(255, 18, 20, 21), // Selected icon color
+        unselectedItemColor: Color.fromARGB(255, 0, 45, 159), // Unselected icon color
+        type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: "Dashboard",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.map),
+            label: "Map",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.info),
+            label: "Info",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: "Profile",
+          ),
         ],
-        selectedItemColor: Colors.blue,
-        unselectedItemColor: Colors.grey,
-        showUnselectedLabels: true,
       ),
     );
   }

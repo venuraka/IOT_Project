@@ -19,7 +19,7 @@ Make sure to update image path
 
 Similar to below example
 
-'''
+```
 android {
 compileSdkVersion 30
 compileOptions {
@@ -39,7 +39,7 @@ implementation 'androidx.appcompat:appcompat:1.3.0'
 buildToolsVersion '30.0.3'
 namespace 'com.pauldemarco.flutter_bluetooth_serial' // <-- ADD THIS
 }
-'''
+```
 
 3. After that naviagte to the "src\main\AndroidManifest.xml" in the same android directory. (ex complete path of file: "C:\Users\GustAcc\AppData\Local\Pub\Cache\hosted\pub.dev\flutter_bluetooth_serial-0.4.0\android\src\main\AndroidManifest.xml")
 
@@ -48,9 +48,10 @@ namespace 'com.pauldemarco.flutter_bluetooth_serial' // <-- ADD THIS
 ex.
 
 before change
-'''
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="io.github.edufolly.flutterbluetoothserial">
-'''
+
+````<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.github.edufolly.flutterbluetoothserial">```
+
 after the change
-''' <manifest xmlns:android="http://schemas.android.com/apk/res/android"> '''
+``` <manifest xmlns:android="http://schemas.android.com/apk/res/android"> ```
+````

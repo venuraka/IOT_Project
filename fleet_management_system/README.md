@@ -1,5 +1,7 @@
 # fleet_management_system
 
+Currently the Map page is not working and if navigated to that using bottom bar app will crash. So don't navigate to that for the time being
+
 # Pre-requisites to work with this project in local projects
 
 ## android\app\src\main\AndroidManifest.xml

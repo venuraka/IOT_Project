@@ -30,6 +30,8 @@ class _DashboardState extends State<Dashboard> {
   String deceleration = "N/A";
   Timer? rpmTimer;
   Timer? speedTimer;
+  String? temporaryAlertMessage;
+  Timer? alertTimer;
 
   String obdDeviceAddress =
       "01:23:45:67:89:BA"; // Replace with your ELM327 MAC address
@@ -87,7 +89,7 @@ class _DashboardState extends State<Dashboard> {
           connection = _connection;
           isConnected = true;
           isConnecting = false;
-          responseText = "Connected!";
+          showTemporaryAlert("Connected to OBD device Successfully");
         });
 
         print("Connected to OBD-II");
@@ -214,9 +216,24 @@ class _DashboardState extends State<Dashboard> {
     }
   }
 
+  void showTemporaryAlert(String message) {
+    setState(() {
+      temporaryAlertMessage = message;
+    });
+
+    alertTimer?.cancel(); // Cancel previous timer if running
+    alertTimer = Timer(const Duration(seconds: 5), () {
+      setState(() {
+        temporaryAlertMessage = null;
+      });
+    });
+  }
+
   @override
   void dispose() {
     rpmTimer?.cancel();
+    connection?.dispose();
+    alertTimer?.cancel();
     connection?.dispose();
     super.dispose();
   }
@@ -302,10 +319,10 @@ class _DashboardState extends State<Dashboard> {
                 border: Border.all(color: Colors.black),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text(
-                "Fire, vibrations, alcohol warnings",
+              child: Text(
+                temporaryAlertMessage ?? "Fire, vibrations, alcohol warnings",
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16),
+                style: const TextStyle(fontSize: 16),
               ),
             ),
             const SizedBox(height: 30),

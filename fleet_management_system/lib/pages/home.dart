@@ -1,5 +1,3 @@
-import 'package:fleet_management_system/pages/OBD_home.dart';
-import 'package:fleet_management_system/pages/OBD_speed.dart';
 import 'package:fleet_management_system/pages/dashboard.dart';
 import 'package:fleet_management_system/pages/info.dart';
 import 'package:fleet_management_system/pages/map.dart';
@@ -22,8 +20,6 @@ class _HomeScreenState extends State<HomeScreen> {
     MapScreen(),
     VehicleInfo(),
     Profile(),
-    OBDIIPage(),
-    SpeedPage(),
   ];
 
   void _onItemTapped(int index) {
@@ -59,11 +55,6 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(icon: Icon(Icons.map), label: "Map"),
           BottomNavigationBarItem(icon: Icon(Icons.info), label: "Info"),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.electric_car),
-            label: "OBD Home",
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.speed), label: "OBD Speed"),
         ],
       ),
     );

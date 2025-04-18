@@ -39,16 +39,12 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: _onItemTapped,
         selectedItemColor: const Color.fromARGB(
           255,
-          18,
-          20,
-          21,
-        ), // Selected icon color
-        unselectedItemColor: Color.fromARGB(
-          255,
           0,
           45,
           159,
-        ), // Unselected icon color
+        ), // Selected icon color
+        unselectedItemColor:Color.fromARGB(255, 15, 92, 239),
+    // Unselected icon color
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Dashboard"),

@@ -23,11 +23,11 @@ class _DashboardState extends State<Dashboard> {
   bool isConnected = false;
   String responseText = "Connecting...";
   String engineRPM = "N/A";
-  double? previousSpeed;
-  DateTime? previousTime;
   String vehicleSpeed = "N/A";
   String acceleration = "N/A";
   String deceleration = "N/A";
+  double? previousSpeed;
+  DateTime? previousTime;
   Timer? rpmTimer;
   Timer? speedTimer;
   String? temporaryAlertMessage;
@@ -59,7 +59,7 @@ class _DashboardState extends State<Dashboard> {
         statuses[Permission.bluetoothScan] != PermissionStatus.granted ||
         statuses[Permission.locationWhenInUse] != PermissionStatus.granted) {
       setState(() {
-        responseText = "Bluetooth or Location permissions denied!";
+        showTemporaryAlert ("Bluetooth or Location permissions denied!");
         isConnecting = false;
       });
       return;
@@ -76,7 +76,7 @@ class _DashboardState extends State<Dashboard> {
 
       if (device.address.isEmpty) {
         setState(() {
-          responseText = "OBD-II device not found!";
+          showTemporaryAlert ("OBD-II device not found!") ;
           isConnecting = false;
           isConnected = false;
         });
@@ -347,7 +347,7 @@ class _DashboardState extends State<Dashboard> {
           width: width,
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 0, 45, 159),
+            color: const Color.fromARGB(255, 15, 92, 239),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(

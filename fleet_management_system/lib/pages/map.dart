@@ -71,10 +71,10 @@ class _MapScreenState extends State<MapScreen> {
   // void _searchLocation(String placeId) async {
   //   final places = GoogleMapsPlaces(apiKey: "AIzaSyD3o1xU8EVjFSSGABrJiCDMkgwh4UfBWoE");
   //   PlacesDetailsResponse detail = await places.getDetailsByPlaceId(placeId);
-
+  //
   //   final lat = detail.result.geometry?.location.lat;
   //   final lng = detail.result.geometry?.location.lng;
-
+  //
   //   if (lat != null && lng != null) {
   //     LatLng searchedLocation = LatLng(lat, lng);
   //     _mapController?.animateCamera(CameraUpdate.newLatLngZoom(searchedLocation, 14.5));

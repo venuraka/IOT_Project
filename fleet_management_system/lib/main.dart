@@ -1,4 +1,3 @@
-import 'package:fleet_management_system/pages/OBD_speed.dart';
 import 'package:fleet_management_system/pages/driver_details.dart';
 import 'package:fleet_management_system/pages/home.dart';
 import 'package:fleet_management_system/pages/login.dart';
@@ -25,7 +24,6 @@ class MyApp extends StatelessWidget {
         '/login': (context) => LoginScreen(), // Manodya
         '/home': (context) => HomeScreen(), //
         '/driverDetails': (context) => DriverDetailsScreen(), // Ayeshi
-        '/speed': (context) => SpeedPage(), //
       },
     );
   }

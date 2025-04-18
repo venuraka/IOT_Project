@@ -1,5 +1,3 @@
-import 'package:fleet_management_system/pages/OBD_home.dart';
-import 'package:fleet_management_system/pages/OBD_speed.dart';
 import 'package:fleet_management_system/pages/dashboard.dart';
 import 'package:fleet_management_system/pages/info.dart';
 import 'package:fleet_management_system/pages/map.dart';
@@ -19,11 +17,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<Widget> _pages = [
     Dashboard(),
-    MapScreen(),
+    RoutingMapScreen(),
     VehicleInfo(),
     Profile(),
-    OBDIIPage(),
-    SpeedPage(),
   ];
 
   void _onItemTapped(int index) {
@@ -43,27 +39,18 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: _onItemTapped,
         selectedItemColor: const Color.fromARGB(
           255,
-          18,
-          20,
-          21,
-        ), // Selected icon color
-        unselectedItemColor: Color.fromARGB(
-          255,
           0,
           45,
           159,
-        ), // Unselected icon color
+        ), // Selected icon color
+        unselectedItemColor:Color.fromARGB(255, 15, 92, 239),
+    // Unselected icon color
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Dashboard"),
           BottomNavigationBarItem(icon: Icon(Icons.map), label: "Map"),
           BottomNavigationBarItem(icon: Icon(Icons.info), label: "Info"),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.electric_car),
-            label: "OBD Home",
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.speed), label: "OBD Speed"),
         ],
       ),
     );

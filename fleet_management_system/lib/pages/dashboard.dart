@@ -1,5 +1,11 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:fleet_management_system/calculations/obd_calculations.dart';
 
 import 'login.dart';
 
@@ -11,6 +17,264 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<Dashboard> {
+
+  BluetoothConnection? connection;
+  bool isConnecting = true;
+  bool isConnected = false;
+  String responseText = "Connecting...";
+  String engineRPM = "N/A";
+  String vehicleSpeed = "N/A";
+  String acceleration = "N/A";
+  String deceleration = "N/A";
+  double? previousSpeed;
+  DateTime? previousTime;
+  Timer? rpmTimer;
+  Timer? speedTimer;
+  String? temporaryAlertMessage;
+  Timer? alertTimer;
+
+  String obdDeviceAddress =
+      "01:23:45:67:89:BA"; // Replace with your ELM327 MAC address
+
+  @override
+  void initState() {
+    super.initState();
+    connectToOBDII();
+  }
+
+  Future<void> connectToOBDII() async {
+    setState(() {
+      isConnecting = true;
+      responseText = "Connecting...";
+    });
+
+    Map<Permission, PermissionStatus> statuses =
+    await [
+      Permission.bluetoothConnect,
+      Permission.bluetoothScan,
+      Permission.locationWhenInUse,
+    ].request();
+
+    if (statuses[Permission.bluetoothConnect] != PermissionStatus.granted ||
+        statuses[Permission.bluetoothScan] != PermissionStatus.granted ||
+        statuses[Permission.locationWhenInUse] != PermissionStatus.granted) {
+      setState(() {
+        isConnecting = false;
+      });
+      showTemporaryAlert("Bluetooth or Location permissions denied!");
+      return;
+    }
+
+    try {
+      List<BluetoothDevice> devices =
+      await FlutterBluetoothSerial.instance.getBondedDevices();
+
+      BluetoothDevice? device = devices.firstWhere(
+            (d) => d.address == obdDeviceAddress,
+        orElse: () => BluetoothDevice(address: "", name: ""),
+      );
+
+      if (device.address.isEmpty) {
+        setState(() {
+          isConnecting = false;
+          isConnected = false;
+        });
+        showTemporaryAlert("OBD-II device not found!");
+        return;
+      }
+
+      BluetoothConnection.toAddress(device.address)
+          .then((_connection) {
+        setState(() {
+          connection = _connection;
+          isConnected = true;
+          isConnecting = false;
+        });
+        showTemporaryAlert("Connected to OBD device Successfully");
+
+        print("Connected to OBD-II");
+        startListening();
+        startRPMUpdates();
+        startSpeedUpdates();
+      })
+          .catchError((error) {
+        setState(() {
+          responseText = "Connection failed!";
+          isConnecting = false;
+          isConnected = false;
+        });
+        print("Connection error: $error");
+      });
+    } catch (e) {
+      setState(() {
+        responseText = "Error: $e";
+        isConnecting = false;
+        isConnected = false;
+      });
+    }
+  }
+
+  void startRPMUpdates() {
+    rpmTimer?.cancel();
+    rpmTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
+      if (isConnected) {
+        sendOBDCommand("010C");
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  void startSpeedUpdates() {
+    speedTimer?.cancel();
+    speedTimer = Timer.periodic(Duration(milliseconds: 50), (timer) {
+      if (isConnected) {
+        sendOBDCommand("010D"); // Speed PID
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  void startListening() {
+    if (connection == null || !isConnected) return;
+
+    connection!.input!.listen((Uint8List data) {
+      String rawResponse = utf8.decode(data);
+      print("Raw OBD Response: $rawResponse");
+
+      if (rawResponse.contains("41 0C")) {
+        parseEngineRPMResponse(rawResponse);
+      } else if (rawResponse.contains("41 0D")) {
+        parseSpeedResponse(rawResponse);
+      }
+    });
+  }
+
+  void sendOBDCommand(String command) async {
+    if (connection == null || !isConnected) {
+      setState(() {
+        responseText = "Not connected to OBD-II device!";
+      });
+      return;
+    }
+
+    String formattedCommand = command + "\r";
+    connection!.output.add(Uint8List.fromList(utf8.encode(formattedCommand)));
+    await connection!.output.allSent;
+  }
+
+  void parseEngineRPMResponse(String response) {
+    if (!response.contains("41 0C")) return;
+
+    List<String> hexValues = response.trim().split(" ");
+    if (hexValues.length < 4) return;
+
+    try {
+      int rpmValue =
+          ((int.parse(hexValues[2], radix: 16) * 256) +
+              int.parse(hexValues[3], radix: 16)) ~/
+              4;
+
+      setState(() {
+        engineRPM = "$rpmValue RPM";
+      });
+    } catch (e) {
+      print("Error parsing RPM: $e");
+    }
+  }
+
+  void parseSpeedResponse(String response) {
+    List<String> hexValues = response.trim().split(" ");
+    if (hexValues.length < 3) return;
+
+    try {
+      int speedValue = int.parse(hexValues[2], radix: 16);
+      DateTime currentTime = DateTime.now();
+
+      // Instant deceleration detection
+      bool instantDeceleration = false;
+      if (previousSpeed != null && (previousSpeed! - speedValue) >= 10) {
+        instantDeceleration = true;
+      }
+
+      // Calculate acceleration and deceleration
+      double accelerationValue = calculateAcceleration(
+        previousSpeed,
+        speedValue.toDouble(),
+        previousTime,
+        currentTime,
+      );
+      double decelerationValue = calculateDeceleration(
+        previousSpeed,
+        speedValue.toDouble(),
+        previousTime,
+        currentTime,
+      );
+
+      // If instant deceleration detected, override calculated value
+      if (instantDeceleration) {
+        decelerationValue = (previousSpeed! - speedValue) /
+            currentTime.difference(previousTime!).inSeconds.clamp(1, 1000);
+      }
+
+      setState(() {
+        vehicleSpeed = "$speedValue km/h";
+        acceleration = "${accelerationValue.toStringAsFixed(2)} m/s²";
+        deceleration = "${decelerationValue.toStringAsFixed(2)} m/s²";
+        previousSpeed = speedValue.toDouble();
+        previousTime = currentTime;
+      });
+    } catch (e) {
+      print("Error parsing speed: $e");
+    }
+  }
+  void showTemporaryAlert(String message) {
+    setState(() {
+      temporaryAlertMessage = message;
+    });
+
+    alertTimer?.cancel(); // Cancel previous timer if running
+    alertTimer = Timer(const Duration(seconds: 5), () {
+      setState(() {
+        temporaryAlertMessage = null;
+      });
+    });
+  }
+
+  String _getDriverStatus() {
+    if (!isConnected) {
+      return "Disconnected";
+    }
+
+    double accValue = double.tryParse(acceleration.replaceAll(" m/s²", "")) ?? 0;
+    double decValue = double.tryParse(deceleration.replaceAll(" m/s²", "")) ?? 0;
+
+    if (accValue > 2.5) {
+      return "Accelerating: ${accValue.toStringAsFixed(2)} m/s²";
+    } else if (decValue > 1.5) {
+      return "Decelerating: ${decValue.toStringAsFixed(2)} m/s²";
+    } else {
+      return "Smooth Driving";
+    }
+  }
+
+  Color _getDriverStatusColor(String value) {
+    if (value.contains("Accelerating")) return Colors.green;
+    if (value.contains("Decelerating")) return Colors.red;
+    if (value == "Disconnected") return Colors.grey;
+    return const Color.fromARGB(255, 15, 92, 239); // Default blue
+  }
+  @override
+  void dispose() {
+    rpmTimer?.cancel();
+    connection?.dispose();
+    alertTimer?.cancel();
+    connection?.dispose();
+    super.dispose();
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -45,12 +309,13 @@ class _DashboardState extends State<Dashboard> {
                       }
                     },
                     itemBuilder:
-                        (context) => [
-                          const PopupMenuItem(
-                            value: 'logout',
-                            child: Text('Logout'),
-                          ),
-                        ],
+                        (context) =>
+                    [
+                      const PopupMenuItem(
+                        value: 'logout',
+                        child: Text('Logout'),
+                      ),
+                    ],
                     child: const CircleAvatar(
                       radius: 18,
                       backgroundImage: AssetImage('assets/images/profile.png'),
@@ -72,12 +337,31 @@ class _DashboardState extends State<Dashboard> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildInfoBox("Speed", "20 km"),
-                _buildInfoBox("RPM", "3000"),
+                _buildInfoBox("Speed", "$vehicleSpeed"),
+                _buildInfoBox("RPM", "$engineRPM"),
               ],
             ),
-            const SizedBox(height: 15),
-            _buildInfoBox("Driver Score", "20 C", width: 120),
+          const SizedBox(height: 15),
+          SizedBox(height: 15),
+            isConnected
+                ? _buildInfoBox(
+              "Driver Status",
+              _getDriverStatus(),
+              width: 120,
+              color: _getDriverStatusColor(_getDriverStatus()),
+            )
+                : GestureDetector(
+              onTap: () {
+                print("Driver Status Tapped - Reconnecting...");
+                connectToOBDII();
+              },
+              child: _buildInfoBox(
+                "Driver Status",
+                isConnecting ? "Reconnecting..." : "Disconnected",
+                width: 160,
+                color: Colors.grey,
+              ),
+            ),
             const SizedBox(height: 20),
             const Text(
               "Alerts",
@@ -91,10 +375,10 @@ class _DashboardState extends State<Dashboard> {
                 border: Border.all(color: Colors.black),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text(
-                "Fire, vibrations, alcohol warnings",
+              child: Text(
+                temporaryAlertMessage ?? "Fire, vibrations, alcohol warnings",
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16),
+                style: const TextStyle(fontSize: 16),
               ),
             ),
             const SizedBox(height: 30),
@@ -107,7 +391,8 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-  Widget _buildInfoBox(String title, String value, {double width = 100}) {
+  Widget _buildInfoBox(String title, String value,
+      {double width = 100, Color? color}) {
     return Column(
       children: [
         Text(
@@ -119,7 +404,7 @@ class _DashboardState extends State<Dashboard> {
           width: width,
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 0, 45, 159),
+            color: color ?? const Color.fromARGB(255, 15, 92, 239), // default
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(

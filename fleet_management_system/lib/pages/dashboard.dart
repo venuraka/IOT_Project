@@ -59,9 +59,9 @@ class _DashboardState extends State<Dashboard> {
         statuses[Permission.bluetoothScan] != PermissionStatus.granted ||
         statuses[Permission.locationWhenInUse] != PermissionStatus.granted) {
       setState(() {
-        showTemporaryAlert("Bluetooth or Location permissions denied!");
         isConnecting = false;
       });
+      showTemporaryAlert("Bluetooth or Location permissions denied!");
       return;
     }
 
@@ -76,10 +76,10 @@ class _DashboardState extends State<Dashboard> {
 
       if (device.address.isEmpty) {
         setState(() {
-          showTemporaryAlert("OBD-II device not found!");
           isConnecting = false;
           isConnected = false;
         });
+        showTemporaryAlert("OBD-II device not found!");
         return;
       }
 
@@ -89,8 +89,8 @@ class _DashboardState extends State<Dashboard> {
           connection = _connection;
           isConnected = true;
           isConnecting = false;
-          showTemporaryAlert("Connected to OBD device Successfully");
         });
+        showTemporaryAlert("Connected to OBD device Successfully");
 
         print("Connected to OBD-II");
         startListening();
@@ -340,11 +340,12 @@ class _DashboardState extends State<Dashboard> {
             )
                 : GestureDetector(
               onTap: () {
+                print("Driver Status Tapped - Reconnecting...");
                 connectToOBDII();
               },
               child: _buildInfoBox(
                 "Driver Status",
-                "Disconnected",
+                isConnecting ? "Reconnecting..." : "Disconnected",
                 width: 160,
                 color: Colors.grey,
               ),

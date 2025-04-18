@@ -127,7 +127,7 @@ class _DashboardState extends State<Dashboard> {
 
   void startSpeedUpdates() {
     speedTimer?.cancel();
-    speedTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
+    speedTimer = Timer.periodic(Duration(milliseconds: 50), (timer) {
       if (isConnected) {
         sendOBDCommand("010D"); // Speed PID
       } else {
@@ -192,6 +192,13 @@ class _DashboardState extends State<Dashboard> {
       int speedValue = int.parse(hexValues[2], radix: 16);
       DateTime currentTime = DateTime.now();
 
+      // Instant deceleration detection
+      bool instantDeceleration = false;
+      if (previousSpeed != null && (previousSpeed! - speedValue) >= 10) {
+        instantDeceleration = true;
+      }
+
+      // Calculate acceleration and deceleration
       double accelerationValue = calculateAcceleration(
         previousSpeed,
         speedValue.toDouble(),
@@ -205,6 +212,12 @@ class _DashboardState extends State<Dashboard> {
         currentTime,
       );
 
+      // If instant deceleration detected, override calculated value
+      if (instantDeceleration) {
+        decelerationValue = (previousSpeed! - speedValue) /
+            currentTime.difference(previousTime!).inSeconds.clamp(1, 1000);
+      }
+
       setState(() {
         vehicleSpeed = "$speedValue km/h";
         acceleration = "${accelerationValue.toStringAsFixed(2)} m/s²";
@@ -216,7 +229,6 @@ class _DashboardState extends State<Dashboard> {
       print("Error parsing speed: $e");
     }
   }
-
   void showTemporaryAlert(String message) {
     setState(() {
       temporaryAlertMessage = message;
@@ -240,7 +252,7 @@ class _DashboardState extends State<Dashboard> {
 
     if (accValue > 2.5) {
       return "Accelerating: ${accValue.toStringAsFixed(2)} m/s²";
-    } else if (decValue > 2.5) {
+    } else if (decValue > 1.5) {
       return "Decelerating: ${decValue.toStringAsFixed(2)} m/s²";
     } else {
       return "Smooth Driving";

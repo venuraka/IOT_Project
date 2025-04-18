@@ -4,6 +4,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 
 // 🔹 Replace this with your actual Google Maps API Key
 const String googleAPIKey = 'AIzaSyA0T9YYL8Xz2Rt7FQo9rPj0qzw2Iwhu2r4';
@@ -33,6 +34,62 @@ class _RoutingMapScreenState extends State<RoutingMapScreen> {
 
   List<MyPrediction> _originPredictions = [];
   List<MyPrediction> _destinationPredictions = [];
+
+  Future<void> _setCurrentLocationAsOrigin() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // Check if location services are enabled
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Location services are disabled.')),
+      );
+      return;
+    }
+
+    // Check for permission
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Location permissions are denied')),
+        );
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(
+                'Location permissions are permanently denied. Please enable them in settings.')),
+      );
+      return;
+    }
+
+    // Get current position
+    Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
+
+    try {
+      List<Placemark> placemarks =
+      await placemarkFromCoordinates(position.latitude, position.longitude);
+      if (placemarks.isNotEmpty) {
+        final placemark = placemarks.first;
+        final address =
+            "${placemark.name}, ${placemark.locality}, ${placemark.country}";
+        setState(() {
+          _originController.text = address;
+          _originPredictions.clear();
+        });
+      }
+    } catch (e) {
+      print("Reverse geocoding error: $e");
+    }
+  }
+
 
   void _getOriginAutocomplete(String input) async {
     if (input.isNotEmpty) {
@@ -226,6 +283,11 @@ class _RoutingMapScreenState extends State<RoutingMapScreen> {
               decoration: InputDecoration(
                 labelText: 'Origin Address',
                 border: OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: Icon(Icons.my_location),
+                  onPressed: _setCurrentLocationAsOrigin,
+                  tooltip: 'Use current location',
+                ),
               ),
               onChanged: _getOriginAutocomplete,
             ),

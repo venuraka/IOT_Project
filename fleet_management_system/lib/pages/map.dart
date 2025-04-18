@@ -1,159 +1,302 @@
-import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:location/location.dart';
-import 'package:google_places_flutter/google_places_flutter.dart';
-//import 'package:google_maps_webservice/places.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:geocoding/geocoding.dart';
 
-class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+// 🔹 Replace this with your actual Google Maps API Key
+const String googleAPIKey = 'AIzaSyA0T9YYL8Xz2Rt7FQo9rPj0qzw2Iwhu2r4';
 
-  @override
-  _MapScreenState createState() => _MapScreenState();
+// Custom prediction class (simpler than using google_places_flutter or other packages)
+class MyPrediction {
+  final String description;
+  final String placeId;
+
+  MyPrediction({required this.description, required this.placeId});
 }
 
-class _MapScreenState extends State<MapScreen> {
-  GoogleMapController? _mapController;
-  final Completer<GoogleMapController> _mapCompleter = Completer();
-  final Location _locationController = Location();
-  TextEditingController _searchController = TextEditingController();
-
-  static const LatLng sourceLocation = LatLng(37.33500926, -122.03272188);
-  static const LatLng destination = LatLng(37.33429383, -122.03981562);
-  LatLng? _currentPosition;
-
+class RoutingMapScreen extends StatefulWidget {
   @override
-  void initState() {
-    super.initState();
-    _getLocationUpdates();
-  }
+  _RoutingMapScreenState createState() => _RoutingMapScreenState();
+}
 
-  void _onMapCreated(GoogleMapController controller) {
-    _mapController = controller;
-    if (!_mapCompleter.isCompleted) {
-      _mapCompleter.complete(controller);
-    }
-  }
+class _RoutingMapScreenState extends State<RoutingMapScreen> {
+  late GoogleMapController _controller;
+  static const LatLng _initialCameraPosition = LatLng(7.8731, 80.7718);
 
-  Future<void> _getLocationUpdates() async {
-    bool serviceEnabled;
-    PermissionStatus permissionGranted;
+  Set<Marker> _markers = {};
+  Set<Polyline> _polylines = {};
 
-    serviceEnabled = await _locationController.serviceEnabled();
-    if (!serviceEnabled) {
-      serviceEnabled = await _locationController.requestService();
-      if (!serviceEnabled) {
-        return;
-      }
-    }
+  TextEditingController _originController = TextEditingController();
+  TextEditingController _destinationController = TextEditingController();
 
-    permissionGranted = await _locationController.hasPermission();
-    if (permissionGranted == PermissionStatus.denied) {
-      permissionGranted = await _locationController.requestPermission();
-      if (permissionGranted != PermissionStatus.granted) {
-        return;
-      }
-    }
+  List<MyPrediction> _originPredictions = [];
+  List<MyPrediction> _destinationPredictions = [];
 
-    _locationController.onLocationChanged.listen((LocationData location) {
-      if (location.latitude != null && location.longitude != null) {
+  void _getOriginAutocomplete(String input) async {
+    if (input.isNotEmpty) {
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$input&key=$googleAPIKey&components=country:lk',
+      );
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final predictions = data['predictions'] as List;
         setState(() {
-          _currentPosition = LatLng(location.latitude!, location.longitude!);
+          _originPredictions = predictions
+              .map((p) => MyPrediction(description: p['description'], placeId: p['place_id']))
+              .toList();
         });
-
-        _mapController?.animateCamera(
-          CameraUpdate.newLatLng(_currentPosition!),
-        );
+      } else {
+        setState(() => _originPredictions = []);
       }
-    });
+    } else {
+      setState(() => _originPredictions = []);
+    }
   }
 
-  // void _searchLocation(String placeId) async {
-  //   final places = GoogleMapsPlaces(apiKey: "AIzaSyD3o1xU8EVjFSSGABrJiCDMkgwh4UfBWoE");
-  //   PlacesDetailsResponse detail = await places.getDetailsByPlaceId(placeId);
-  //
-  //   final lat = detail.result.geometry?.location.lat;
-  //   final lng = detail.result.geometry?.location.lng;
-  //
-  //   if (lat != null && lng != null) {
-  //     LatLng searchedLocation = LatLng(lat, lng);
-  //     _mapController?.animateCamera(CameraUpdate.newLatLngZoom(searchedLocation, 14.5));
-  //   }
-  // }
+  void _getDestinationAutocomplete(String input) async {
+    if (input.isNotEmpty) {
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$input&key=$googleAPIKey&components=country:lk',
+      );
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final predictions = data['predictions'] as List;
+        setState(() {
+          _destinationPredictions = predictions
+              .map((p) => MyPrediction(description: p['description'], placeId: p['place_id']))
+              .toList();
+        });
+      } else {
+        setState(() => _destinationPredictions = []);
+      }
+    } else {
+      setState(() => _destinationPredictions = []);
+    }
+  }
+
+  Future<LatLng?> _getCoordinatesFromPlaceId(String placeId) async {
+    final url = Uri.parse(
+      'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&key=$googleAPIKey',
+    );
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final location = data['result']['geometry']['location'];
+      return LatLng(location['lat'], location['lng']);
+    }
+    return null;
+  }
+
+  Future<LatLng?> _getCoordinatesFromAddress(String address) async {
+    try {
+      List<Location> locations = await locationFromAddress(address);
+      if (locations.isNotEmpty) {
+        return LatLng(locations[0].latitude, locations[0].longitude);
+      }
+    } catch (e) {
+      print("Geocoding error: $e");
+    }
+    return null;
+  }
+
+  Future<void> _findRoute() async {
+    LatLng? originCoordinates;
+    LatLng? destinationCoordinates;
+
+    if (_originController.text.isNotEmpty &&
+        _originPredictions.any((p) => p.description == _originController.text)) {
+      final selectedPrediction = _originPredictions.firstWhere(
+              (p) => p.description == _originController.text);
+      originCoordinates =
+      await _getCoordinatesFromPlaceId(selectedPrediction.placeId);
+    } else {
+      originCoordinates =
+      await _getCoordinatesFromAddress(_originController.text.trim());
+    }
+
+    if (_destinationController.text.isNotEmpty &&
+        _destinationPredictions.any((p) => p.description == _destinationController.text)) {
+      final selectedPrediction = _destinationPredictions.firstWhere(
+              (p) => p.description == _destinationController.text);
+      destinationCoordinates =
+      await _getCoordinatesFromPlaceId(selectedPrediction.placeId);
+    } else {
+      destinationCoordinates =
+      await _getCoordinatesFromAddress(_destinationController.text.trim());
+    }
+
+    if (originCoordinates != null && destinationCoordinates != null) {
+      _getDirections(originCoordinates, destinationCoordinates);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not resolve one or both locations.')),
+      );
+    }
+  }
+
+  Future<void> _getDirections(LatLng origin, LatLng destination) async {
+    final url = Uri.parse(
+      'https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&key=$googleAPIKey',
+    );
+
+    final response = await http.get(url);
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final route = data['routes'][0];
+      final polyline = route['overview_polyline']['points'];
+
+      PolylinePoints polylinePoints = PolylinePoints();
+      List<PointLatLng> result = polylinePoints.decodePolyline(polyline);
+
+      List<LatLng> polylineCoordinates = result
+          .map((point) => LatLng(point.latitude, point.longitude))
+          .toList();
+
+      setState(() {
+        _polylines.clear();
+        _markers.clear();
+
+        _polylines.add(Polyline(
+          polylineId: PolylineId('route'),
+          color: Colors.blue,
+          width: 5,
+          points: polylineCoordinates,
+        ));
+
+        _markers.add(Marker(
+          markerId: MarkerId('origin'),
+          position: origin,
+          infoWindow: InfoWindow(title: 'Origin'),
+        ));
+
+        _markers.add(Marker(
+          markerId: MarkerId('destination'),
+          position: destination,
+          infoWindow: InfoWindow(title: 'Destination'),
+        ));
+
+        _controller.animateCamera(
+          CameraUpdate.newLatLngBounds(
+            LatLngBounds(
+              southwest: LatLng(
+                origin.latitude <= destination.latitude
+                    ? origin.latitude
+                    : destination.latitude,
+                origin.longitude <= destination.longitude
+                    ? origin.longitude
+                    : destination.longitude,
+              ),
+              northeast: LatLng(
+                origin.latitude >= destination.latitude
+                    ? origin.latitude
+                    : destination.latitude,
+                origin.longitude >= destination.longitude
+                    ? origin.longitude
+                    : destination.longitude,
+              ),
+            ),
+            100.0,
+          ),
+        );
+      });
+    } else {
+      print('Failed to get directions: ${response.body}');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Location Tracking',
-          style: TextStyle(color: Colors.black),
-        ),
-        backgroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.black),
+        title: Text('Route Finder with Autocomplete'),
       ),
-      body: Stack(
+      body: Column(
         children: [
-          GoogleMap(
-            onMapCreated: _onMapCreated,
-            initialCameraPosition: const CameraPosition(
-              target: sourceLocation,
-              zoom: 14.5,
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              controller: _originController,
+              decoration: InputDecoration(
+                labelText: 'Origin Address',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: _getOriginAutocomplete,
             ),
-            markers: {
-              if (_currentPosition != null)
-                Marker(
-                  markerId: const MarkerId('currentLocation'),
-                  position: _currentPosition!,
-                  icon: BitmapDescriptor.defaultMarkerWithHue(
-                    BitmapDescriptor.hueBlue,
-                  ),
-                ),
-              const Marker(
-                markerId: MarkerId('sourceLocation'),
-                position: sourceLocation,
-              ),
-              const Marker(
-                markerId: MarkerId('destinationLocation'),
-                position: destination,
-              ),
-            },
-            myLocationEnabled: true,
-            myLocationButtonEnabled: true,
           ),
-          Positioned(
-            top: 10,
-            left: 15,
-            right: 15,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 5,
-                    offset: Offset(0, 2),
-                  ),
-                ],
+          if (_originPredictions.isNotEmpty)
+            Container(
+              height: 150,
+              child: ListView.builder(
+                itemCount: _originPredictions.length,
+                itemBuilder: (context, index) {
+                  return ListTile(
+                    title: Text(_originPredictions[index].description),
+                    onTap: () {
+                      setState(() {
+                        _originController.text =
+                            _originPredictions[index].description;
+                        _originPredictions.clear();
+                      });
+                    },
+                  );
+                },
               ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: GooglePlaceAutoCompleteTextField(
-                  textEditingController: _searchController,
-                  googleAPIKey: "AIzaSyD3o1xU8EVjFSSGABrJiCDMkgwh4UfBWoE",
-                  inputDecoration: InputDecoration(
-                    hintText: "Search Location",
-                    border: InputBorder.none,
-                    prefixIcon: Icon(Icons.search),
-                  ),
-                  debounceTime: 600,
-                  isLatLngRequired: true,
-                  // getPlaceDetailWithLatLng: (prediction) {
-                  //   _searchLocation(prediction.placeId);
-                  // },
-                ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              controller: _destinationController,
+              decoration: InputDecoration(
+                labelText: 'Destination Address',
+                border: OutlineInputBorder(),
               ),
+              onChanged: _getDestinationAutocomplete,
+            ),
+          ),
+          if (_destinationPredictions.isNotEmpty)
+            Container(
+              height: 150,
+              child: ListView.builder(
+                itemCount: _destinationPredictions.length,
+                itemBuilder: (context, index) {
+                  return ListTile(
+                    title: Text(_destinationPredictions[index].description),
+                    onTap: () {
+                      setState(() {
+                        _destinationController.text =
+                            _destinationPredictions[index].description;
+                        _destinationPredictions.clear();
+                      });
+                    },
+                  );
+                },
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: ElevatedButton(
+              onPressed: _findRoute,
+              child: Text('Find Route'),
+            ),
+          ),
+          Expanded(
+            child: GoogleMap(
+              initialCameraPosition: CameraPosition(
+                target: _initialCameraPosition,
+                zoom: 7.0,
+              ),
+              onMapCreated: (controller) {
+                _controller = controller;
+              },
+              markers: _markers,
+              polylines: _polylines,
             ),
           ),
         ],

@@ -272,7 +272,15 @@ class _RoutingMapScreenState extends State<RoutingMapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Route Finder with Autocomplete'),
+        title: Text(
+          'Route Optimizer',
+          style: TextStyle(
+            color: Colors.white,
+            fontFamily: 'Poppins',
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: Colors.blue, // Optional: ensure contrast with white text
       ),
       body: Column(
         children: [
@@ -281,12 +289,12 @@ class _RoutingMapScreenState extends State<RoutingMapScreen> {
             child: TextField(
               controller: _originController,
               decoration: InputDecoration(
-                labelText: 'Origin Address',
+                labelText: 'Choose Start Location',
                 border: OutlineInputBorder(),
                 suffixIcon: IconButton(
-                  icon: Icon(Icons.my_location),
+                  icon: Icon(Icons.my_location,color: Color.fromARGB(255, 15, 92, 239)),
                   onPressed: _setCurrentLocationAsOrigin,
-                  tooltip: 'Use current location',
+                  tooltip: 'Choose Destination',
                 ),
               ),
               onChanged: _getOriginAutocomplete,

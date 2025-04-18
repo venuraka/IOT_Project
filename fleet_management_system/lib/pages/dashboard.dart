@@ -59,7 +59,7 @@ class _DashboardState extends State<Dashboard> {
         statuses[Permission.bluetoothScan] != PermissionStatus.granted ||
         statuses[Permission.locationWhenInUse] != PermissionStatus.granted) {
       setState(() {
-        showTemporaryAlert ("Bluetooth or Location permissions denied!");
+        showTemporaryAlert("Bluetooth or Location permissions denied!");
         isConnecting = false;
       });
       return;
@@ -76,7 +76,7 @@ class _DashboardState extends State<Dashboard> {
 
       if (device.address.isEmpty) {
         setState(() {
-          showTemporaryAlert ("OBD-II device not found!") ;
+          showTemporaryAlert("OBD-II device not found!");
           isConnecting = false;
           isConnected = false;
         });
@@ -183,6 +183,7 @@ class _DashboardState extends State<Dashboard> {
       print("Error parsing RPM: $e");
     }
   }
+
   void parseSpeedResponse(String response) {
     List<String> hexValues = response.trim().split(" ");
     if (hexValues.length < 3) return;
@@ -229,6 +230,29 @@ class _DashboardState extends State<Dashboard> {
     });
   }
 
+  String _getDriverStatus() {
+    if (!isConnected) {
+      return "Disconnected";
+    }
+
+    double accValue = double.tryParse(acceleration.replaceAll(" m/s²", "")) ?? 0;
+    double decValue = double.tryParse(deceleration.replaceAll(" m/s²", "")) ?? 0;
+
+    if (accValue > 2.5) {
+      return "Accelerating: ${accValue.toStringAsFixed(2)} m/s²";
+    } else if (decValue > 2.5) {
+      return "Decelerating: ${decValue.toStringAsFixed(2)} m/s²";
+    } else {
+      return "Smooth Driving";
+    }
+  }
+
+  Color _getDriverStatusColor(String value) {
+    if (value.contains("Accelerating")) return Colors.green;
+    if (value.contains("Decelerating")) return Colors.red;
+    if (value == "Disconnected") return Colors.grey;
+    return const Color.fromARGB(255, 15, 92, 239); // Default blue
+  }
   @override
   void dispose() {
     rpmTimer?.cancel();
@@ -273,12 +297,13 @@ class _DashboardState extends State<Dashboard> {
                       }
                     },
                     itemBuilder:
-                        (context) => [
-                          const PopupMenuItem(
-                            value: 'logout',
-                            child: Text('Logout'),
-                          ),
-                        ],
+                        (context) =>
+                    [
+                      const PopupMenuItem(
+                        value: 'logout',
+                        child: Text('Logout'),
+                      ),
+                    ],
                     child: const CircleAvatar(
                       radius: 18,
                       backgroundImage: AssetImage('assets/images/profile.png'),
@@ -304,8 +329,26 @@ class _DashboardState extends State<Dashboard> {
                 _buildInfoBox("RPM", "$engineRPM"),
               ],
             ),
-            const SizedBox(height: 15),
-            _buildInfoBox("Driver Score", "20 C", width: 120),
+          const SizedBox(height: 15),
+          SizedBox(height: 15),
+            isConnected
+                ? _buildInfoBox(
+              "Driver Status",
+              _getDriverStatus(),
+              width: 120,
+              color: _getDriverStatusColor(_getDriverStatus()),
+            )
+                : GestureDetector(
+              onTap: () {
+                connectToOBDII();
+              },
+              child: _buildInfoBox(
+                "Driver Status",
+                "Disconnected",
+                width: 160,
+                color: Colors.grey,
+              ),
+            ),
             const SizedBox(height: 20),
             const Text(
               "Alerts",
@@ -335,7 +378,8 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-  Widget _buildInfoBox(String title, String value, {double width = 100}) {
+  Widget _buildInfoBox(String title, String value,
+      {double width = 100, Color? color}) {
     return Column(
       children: [
         Text(
@@ -347,7 +391,7 @@ class _DashboardState extends State<Dashboard> {
           width: width,
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 15, 92, 239),
+            color: color ?? const Color.fromARGB(255, 15, 92, 239), // default
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(

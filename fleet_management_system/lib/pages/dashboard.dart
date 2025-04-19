@@ -1,6 +1,8 @@
+import 'package:web_project/services/auth_service.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'driverprofile.dart';
+import 'login.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -35,8 +37,18 @@ class DashboardPage extends StatelessWidget {
                   ),
                   const Spacer(),
                   TextButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context); // Go back to login
+                    onPressed: () async {
+                      try {
+                        await authServiceNotifier.value?.signOut(); // Firebase sign out
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(builder: (context) => LoginPage()),
+                          (route) => false,
+                        ); // Go to login and clear stack
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Logout failed: $e')),
+                        );
+                      }
                     },
                     icon: const Icon(Icons.logout, color: Colors.white),
                     label: const Text(

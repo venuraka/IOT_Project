@@ -38,6 +38,8 @@ dependencies:
   firebase_auth: ^5.5.2
   web: ^1.1.1
   firebase_database:
+  latlong2: ^0.9.1
+  flutter_map: ^8.1.1
 
 dev_dependencies:
   flutter_test:

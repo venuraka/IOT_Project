@@ -1,5 +1,8 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+
 
 class DriverProfile extends StatelessWidget {
   final String driverId;
@@ -179,10 +182,28 @@ class DriverProfile extends StatelessWidget {
                         height: 470,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
-                          image: const DecorationImage(
-                            image: AssetImage('images/login2.png'),
-                            fit: BoxFit.cover,
+                        ),
+                        child: FlutterMap(
+                          options: const MapOptions(
+                            initialCenter: LatLng(7.8731, 80.7718), // Sri Lanka
+                            initialZoom: 8.0,
                           ),
+                          children: [
+                            TileLayer(
+                              urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              subdomains: const ['a', 'b', 'c'],
+                            ),
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  point: const LatLng(7.8731, 80.7718),
+                                  width: 40,
+                                  height: 40,
+                                  child: const Icon(Icons.location_on, color: Colors.red, size: 40),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ),

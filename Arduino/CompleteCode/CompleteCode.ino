@@ -12,10 +12,10 @@
 #define DATABASE_URL "https://fleetz-74a25-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
 // Flame Sensor Pins (ESP32)
-#define FLAME_SENSOR_DIGITAL 4     // Digital input from flame sensor
-#define FLAME_SENSOR_ANALOG 34     // Use GPIO34 for analog input
+#define FLAME_SENSOR_DIGITAL 4    
+#define FLAME_SENSOR_ANALOG 34     
 
-int threshold = 500;  // Set detection threshold
+int threshold = 200;  // Set detection threshold for flame sensor 
 
 // Firebase objects
 FirebaseData fbdo;
@@ -42,8 +42,8 @@ void setup() {
   config.database_url = DATABASE_URL;
 
   // OPTIONAL: Use a newly created user, or anonymous login for testing
-  auth.user.email = "testuser@gmail.com"; // Replace with your test user
-  auth.user.password = "test1234";        // Or leave blank if using anonymous login
+  auth.user.email = "testuser@gmail.com"; 
+  auth.user.password = "test1234";        
 
   // Required for token generation status
   config.token_status_callback = tokenStatusCallback;
@@ -62,6 +62,8 @@ void setup() {
 
 void loop() {
   if (!Firebase.ready()) return;
+
+  //flame sensor start 
   int analogValue = analogRead(FLAME_SENSOR_ANALOG);
   String flameStatus;
 
@@ -81,4 +83,6 @@ void loop() {
   }
 
   delay(100);  // 2 second interval
+
+  //flame sensor start 
 }

@@ -1,142 +1,225 @@
 import 'package:flutter/material.dart';
-import 'dashboard.dart';
+import 'package:web_project/Pages/dashboard.dart';
+import 'package:web_project/services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginPage extends StatefulWidget {
+  @override
+  _LoginPageState createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Scaffold(
-      body: Column(
+      body: isMobile ? buildMobileLayout(context) : buildWebLayout(context),
+    );
+  }
+
+  Widget buildMobileLayout(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
         children: [
-          Expanded(
-            flex: 3,
-            child: Stack(
-              children: [
-                Container(
-                  width: double.infinity,
-                  child: Image.asset(
-                    'assets/images/login.png',
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                Positioned(
-                  top: 40,
-                  left: 15,
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.arrow_back,
-                      color: Color.fromARGB(255, 0, 0, 0),
-                      size: 20,
-                    ),
-                    onPressed: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => Dashboard()),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+          Image.asset(
+            'images/login2.png',
+            width: double.infinity,
+            fit: BoxFit.contain,
           ),
-          SingleChildScrollView(
-            scrollDirection: Axis.vertical,
-            child: Expanded(
-              flex: 3,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20.0,
-                  vertical: 30.0,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Welcome Back',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    const Text(
-                      'Please enter your details',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 20),
-                    Form(
-                      key: _formKey,
-                      child: Column(
-                        children: [
-                          TextFormField(
-                            controller: emailController,
-                            decoration: const InputDecoration(
-                              labelText: 'Email',
-                              prefixIcon: Icon(Icons.email),
-                            ),
-                            keyboardType: TextInputType.emailAddress,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your email';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 15),
-                          TextFormField(
-                            controller: passwordController,
-                            decoration: const InputDecoration(
-                              labelText: 'Password',
-                              prefixIcon: Icon(Icons.lock),
-                            ),
-                            obscureText: true,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your password';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 25),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                minimumSize: const Size(double.infinity, 50),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              onPressed: () {
-                                if (_formKey.currentState!.validate()) {
-                                  print('Email: ${emailController.text}');
-                                  print('Password: ${passwordController.text}');
-                                }
-                              },
-                              child: const Text(
-                                'Login',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+          Container(
+            width: double.infinity,
+            color: Colors.white,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20.0,
+              vertical: 40.0,
             ),
+            child: buildForm(context),
           ),
         ],
       ),
     );
+  }
+
+  Widget buildWebLayout(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 1,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40.0),
+            child: Center(
+              child: SingleChildScrollView(child: buildForm(context)),
+            ),
+          ),
+        ),
+        Expanded(
+          flex: 1,
+          child: Image.asset(
+            'images/login2.png',
+            width: double.infinity,
+            height: double.infinity,
+            fit: BoxFit.cover,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget buildForm(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Welcome Back',
+          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+        ),
+        SizedBox(height: 8),
+        Text(
+          'Please Enter your Details',
+          style: TextStyle(fontSize: 16, color: Colors.black54),
+        ),
+        SizedBox(height: 30),
+        if (_errorMessage != null)
+          Container(
+            padding: EdgeInsets.all(8),
+            color: Colors.red[100],
+            width: double.infinity,
+            child: Text(
+              _errorMessage!,
+              style: TextStyle(color: Colors.red[900]),
+            ),
+          ),
+        Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                controller: emailController,
+                decoration: InputDecoration(
+                  hintText: 'Enter Email',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                ),
+                keyboardType: TextInputType.emailAddress,
+                validator:
+                    (value) =>
+                        value == null || value.isEmpty
+                            ? 'Please enter your email'
+                            : null,
+              ),
+              SizedBox(height: 20),
+              TextFormField(
+                controller: passwordController,
+                decoration: InputDecoration(
+                  hintText: 'Enter Password',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                ),
+                obscureText: true,
+                validator:
+                    (value) =>
+                        value == null || value.isEmpty
+                            ? 'Please enter your password'
+                            : null,
+              ),
+              SizedBox(height: 30),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _signIn,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue[900],
+                    padding: EdgeInsets.symmetric(vertical: 15),
+                    textStyle: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  child:
+                      _isLoading
+                          ? SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                          : Text(
+                            'Sign In',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _signIn() async {
+    // Hide keyboard
+    FocusScope.of(context).unfocus();
+
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+
+      try {
+        final authService = authServiceNotifier.value;
+
+        if (authService != null) {
+          final result = await authService.signInWithEmailAndPassword(
+            email: emailController.text.trim(),
+            password: passwordController.text.trim(),
+          );
+
+          if (result != null && mounted) {
+            // Navigate to dashboard on successful login
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => DashboardPage()),
+            );
+          }
+        }
+      } on FirebaseAuthException catch (e) {
+        setState(() {
+          _errorMessage =
+              e.message ?? 'Authentication failed. Please try again.';
+        });
+      } catch (e) {
+        setState(() {
+          _errorMessage = 'An error occurred. Please try again later.';
+        });
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    }
   }
 }

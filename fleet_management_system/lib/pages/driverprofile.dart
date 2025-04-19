@@ -1,8 +1,17 @@
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
 class DriverProfile extends StatelessWidget {
+  final String driverId;
+  final String driverName;
+
+  const DriverProfile({super.key, required this.driverId, required this.driverName});
+
   @override
   Widget build(BuildContext context) {
+    // Reference to the specific driver's data in Firebase
+    final databaseRef = FirebaseDatabase.instance.ref().child('DataSet/Drivers/$driverId');
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -13,116 +22,153 @@ class DriverProfile extends StatelessWidget {
         ),
         title: const Text("Driver Details", style: TextStyle(color: Colors.white)),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Profile Info Section
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF003366),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CircleAvatar(
-                    radius: 40,
-                    backgroundImage: AssetImage('images/login2.png'), 
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          "Nick Harreled",
-                          style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          "184/188 2nd Cross Street 11, Colombo\nSri Lanka",
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Wrap(
-                      spacing: 20,
-                      runSpacing: 10,
-                      children: const [
-                        _ProfileInfo(title: "Contact Number", value: "+94 775443456"),
-                        _ProfileInfo(title: "Birth Day", value: "2000/01/12"),
-                        _ProfileInfo(title: "Assigned Vehicle", value: "CHS - 7752"),
-                        _ProfileInfo(title: "Gender", value: "Male"),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+      body: StreamBuilder(
+        stream: databaseRef.onValue,
+        builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
+          // Handle loading state
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          // Handle errors
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+          // Handle no data
+          if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
+            return const Center(child: Text('Driver data not found'));
+          }
 
-            const SizedBox(height: 30),
+          // Extract driver data
+          final driverData = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
+          final address = driverData['address']?.toString() ?? 'Not provided';
+          final birthday = driverData['birthday']?.toString() ?? 'Not provided';
+          final gender = driverData['gender']?.toString() ?? 'Not provided';
+          final number = driverData['number']?.toString() ?? 'Not provided';
+          final vehicle = driverData['vehicle']?.toString() ?? 'Not provided';
+          final picUrl = driverData['pic']?.toString() ?? '';
 
-            // Sensor Data and Map
-            Row(
+          // Extract OBDdata
+          final obdData = driverData['OBDdata'] as Map<dynamic, dynamic>? ?? {};
+          print('OBD Data: $obdData');
+          final vibration = obdData['Vibration']?.toString() ?? 'Not available';
+          final humidity = obdData['Humidity']?.toString() ?? 'Not available';
+          final remainingFuel = obdData['Remaining Fule']?.toString() ?? 'Not available';
+          final temperature = obdData['Temperture']?.toString() ?? 'Not available';
+          final speed = obdData['Speed']?.toString() ?? 'Not available';
+          final fuelConsumption = obdData['Fuel Consumption']?.toString() ?? 'Not available';
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Sensor Cards with blue background
-                Expanded(
-                  flex: 1,
-                  child: Container(
-                    height: 470,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF003366),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Wrap(
-                      spacing: 16,
-                      runSpacing: 16,
-                      children: const [
-                        _InfoCard(title: "Vibration", value: "70Hz", isDark: true),
-                        _InfoCard(title: "Humidity", value: "77%", isDark: true),
-                        _InfoCard(title: "Remaining Fuel", value: "20L", isDark: true),
-                        _InfoCard(title: "Temperature", value: "77C", isDark: true),
-                        _InfoCard(title: "Speed", value: "50kmph", isDark: true),
-                        _InfoCard(title: "Fuel Consumption", value: "8Km", isDark: true),
-                      ],
-                    ),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF003366),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Profile Picture
+                      CircleAvatar(
+                        radius: 40,
+                        backgroundImage: picUrl.isNotEmpty
+                            ? NetworkImage(picUrl)
+                            : const AssetImage('images/login2.png') as ImageProvider,
+                        onBackgroundImageError: (_, __) => const AssetImage('images/login2.png'),
+                      ),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              driverName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              address,
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Wrap(
+                          spacing: 20,
+                          runSpacing: 10,
+                          children: [
+                            _ProfileInfo(title: "Contact Number", value: number),
+                            _ProfileInfo(title: "Birth Day", value: birthday),
+                            _ProfileInfo(title: "Assigned Vehicle", value: vehicle),
+                            _ProfileInfo(title: "Gender", value: gender),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-
-                const SizedBox(width: 20),
-
-                // Map Container
-                Expanded(
-                  child: Container(
-                    height: 470,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      image: const DecorationImage(
-                        image: AssetImage('images/login2.png'), // Replace with map or another image
-                        fit: BoxFit.cover,
+                const SizedBox(height: 30),
+                // Sensor Data and Map
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: Container(
+                        height: 470,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF003366),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Wrap(
+                          spacing: 16,
+                          runSpacing: 16,
+                          children: [
+                            _InfoCard(title: "Vibration", value: vibration, isDark: true),
+                            _InfoCard(title: "Humidity", value: humidity, isDark: true),
+                            _InfoCard(title: "Remaining Fuel", value: remainingFuel, isDark: true),
+                            _InfoCard(title: "Temperature", value: temperature, isDark: true),
+                            _InfoCard(title: "Speed", value: speed, isDark: true),
+                            _InfoCard(title: "Fuel Consumption", value: fuelConsumption, isDark: true),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 20),
+                    // Map Container
+                    Expanded(
+                      child: Container(
+                        height: 470,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          image: const DecorationImage(
+                            image: AssetImage('images/login2.png'),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 }
-
-// ----------------------------
 
 class _ProfileInfo extends StatelessWidget {
   final String title;
@@ -145,8 +191,6 @@ class _ProfileInfo extends StatelessWidget {
     );
   }
 }
-
-// ----------------------------
 
 class _InfoCard extends StatelessWidget {
   final String title;

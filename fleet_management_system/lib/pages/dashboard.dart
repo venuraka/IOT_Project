@@ -18,7 +18,7 @@ class DashboardPage extends StatelessWidget {
           children: [
             // Header with title and logout button
             Container(
-              color: const Color(0xFF184A8C),
+                color: const Color(0xFF184A8C),
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               child: Row(

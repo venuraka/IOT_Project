@@ -14,14 +14,32 @@ class DriverProfile extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF003366),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text("Driver Details", style: TextStyle(color: Colors.white)),
+      appBar: PreferredSize(
+  preferredSize: Size.fromHeight(70),
+  child: AppBar(
+    backgroundColor: const Color(0xFF184A8C),
+    leading: Padding(
+      padding: const EdgeInsets.only(top: 15.0), // top margin for back button
+      child: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.white),
+        onPressed: () => Navigator.pop(context),
       ),
+    ),
+    title: Padding(
+      padding: const EdgeInsets.only(top: 15.0), // top margin for title
+      child: Text(
+        "Driver Details",
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+        ),
+      ),
+    ),
+  ),
+),
+
       body: StreamBuilder(
         stream: databaseRef.onValue,
         builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
@@ -72,12 +90,15 @@ class DriverProfile extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Profile Picture
-                      CircleAvatar(
-                        radius: 40,
-                        backgroundImage: picUrl.isNotEmpty
-                            ? NetworkImage(picUrl)
-                            : const AssetImage('images/login2.png') as ImageProvider,
-                        onBackgroundImageError: (_, __) => const AssetImage('images/login2.png'),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 9, left: 5),
+                        child: CircleAvatar(
+                          radius: 40,
+                          backgroundImage: picUrl.isNotEmpty
+                              ? NetworkImage(picUrl)
+                              : const AssetImage('images/login2.png') as ImageProvider,
+                          onBackgroundImageError: (_, __) => const AssetImage('images/login2.png'),
+                        ),
                       ),
                       const SizedBox(width: 20),
                       Expanded(
@@ -85,12 +106,15 @@ class DriverProfile extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              driverName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
+                            Padding(
+                              padding: const EdgeInsets.only(top: 15),
+                              child: Text(
+                                driverName,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -103,15 +127,18 @@ class DriverProfile extends StatelessWidget {
                       ),
                       Expanded(
                         flex: 2,
-                        child: Wrap(
-                          spacing: 20,
-                          runSpacing: 10,
-                          children: [
-                            _ProfileInfo(title: "Contact Number", value: number),
-                            _ProfileInfo(title: "Birth Day", value: birthday),
-                            _ProfileInfo(title: "Assigned Vehicle", value: vehicle),
-                            _ProfileInfo(title: "Gender", value: gender),
-                          ],
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 20),
+                          child: Wrap(
+                            spacing: 20,
+                            runSpacing: 10,
+                            children: [
+                              _ProfileInfo(title: "Contact Number", value: number),
+                              _ProfileInfo(title: "Birth Day", value: birthday),
+                              _ProfileInfo(title: "Assigned Vehicle", value: vehicle),
+                              _ProfileInfo(title: "Gender", value: gender),
+                            ],
+                          ),
                         ),
                       ),
                     ],

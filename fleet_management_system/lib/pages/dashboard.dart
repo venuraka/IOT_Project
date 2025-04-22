@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
@@ -32,6 +33,11 @@ class _DashboardState extends State<Dashboard> {
   Timer? speedTimer;
   String? temporaryAlertMessage;
   Timer? alertTimer;
+
+  double? frontDistance;
+  double? backDistance;
+  double? leftDistance;
+  double? rightDistance;
 
   String obdDeviceAddress =
       "01:23:45:67:89:BA"; // Replace with your ELM327 MAC address
@@ -383,7 +389,44 @@ class _DashboardState extends State<Dashboard> {
             ),
             const SizedBox(height: 30),
             Expanded(
-              child: Image.asset("assets/images/car.png", fit: BoxFit.contain),
+              child: Stack(
+                children: [
+                  // Positioned(top: 0, left: 80, child: _buildRadarArc()),
+                  // Positioned(top: 0, right: 80, child: _buildRadarArc()),
+                  // Positioned(bottom: -20, left: 80, child: _buildRadarArc()),
+                  // Positioned(bottom: -20, right: 80, child: _buildRadarArc()),
+                  Positioned(top: 0, left: 100, child: Transform.rotate(
+                    angle: 5.55,
+                    child: _buildRadarArc(),
+                  ),
+                  ),
+                  Positioned(
+                    top: 0,
+                    right: 100,
+                    child: Transform.rotate(
+                      angle: 1.00,
+                      child: _buildRadarArc(),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    left: 100,
+                    child: Transform.rotate(
+                      angle: 3.95,
+                      child: _buildRadarArc(),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 100,
+                    child: Transform.rotate(
+                      angle: 2.20,
+                      child: _buildRadarArc(),
+                    ),
+                  ),
+                  Center(child: Image.asset("assets/images/car.png", fit: BoxFit.contain)),
+                ],
+              ),
             ),
           ],
         ),
@@ -391,6 +434,41 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
+
+  Widget _buildRadarArc() {
+    return CustomPaint(
+      size: Size(60, 60),
+      painter: RadarArcPainter(),
+    );
+  }
+}
+
+class RadarArcPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint arcPaint = Paint()
+      ..color = Colors.red.withOpacity(0.7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+
+    for (int i = 0; i < 3; i++) {
+      double currentRadius = radius * (0.5 + i * 0.3);
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: currentRadius),
+        3.5,
+        2.2,
+        false,
+        arcPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
   Widget _buildInfoBox(String title, String value,
       {double width = 100, Color? color}) {
     return Column(
@@ -420,4 +498,4 @@ class _DashboardState extends State<Dashboard> {
       ],
     );
   }
-}
+

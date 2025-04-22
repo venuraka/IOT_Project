@@ -68,7 +68,7 @@ void loop() {
   String flameStatus;
 
   if (analogValue < threshold) {
-    flameStatus = "🔥 Flame Detected!";
+    flameStatus = "Flame Detected!";
     Serial.println(flameStatus);
   } else {
     flameStatus = "No Flame Detected.";

@@ -318,7 +318,7 @@ class _DashboardState extends State<Dashboard> {
                     ],
                     child: const CircleAvatar(
                       radius: 18,
-                      backgroundImage: AssetImage('assets/images/profile.png'),
+                      backgroundImage: AssetImage("assets/images/profile.png"),
                     ),
                   ),
                 ],
@@ -383,7 +383,7 @@ class _DashboardState extends State<Dashboard> {
             ),
             const SizedBox(height: 30),
             Expanded(
-              child: Image.asset('assets/images/car.png', fit: BoxFit.contain),
+              child: Image.asset("assets/images/car.png", fit: BoxFit.contain),
             ),
           ],
         ),

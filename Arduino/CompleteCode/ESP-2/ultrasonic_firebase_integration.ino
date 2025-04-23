@@ -16,52 +16,51 @@ FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
 
-// ===== Ultrasonic Pins and Setup =====
-const int trigPins[2] = {12, 23};   // Front Left, Front Right
+// ===== Ultrasonic Sensor Configuration =====
+const int trigPins[2] = {12, 23};   // Example: frontLeft = 12/14, frontRight = 23/21
 const int echoPins[2] = {14, 21};
 const char* sensorKeys[2] = {"frontLeft", "frontRight"};
 
 const int numSensors = 2;
-const int numSamples = 5;  // Average for smoothing
+const int numSamples = 5;
 float distances[2];
 
 void setup() {
   Serial.begin(115200);
 
-  // Setup ultrasonic pins
+  // Initialize pins
   for (int i = 0; i < numSensors; i++) {
     pinMode(trigPins[i], OUTPUT);
     pinMode(echoPins[i], INPUT);
   }
 
-  // Connect to Wi-Fi
+  // Connect to WiFi
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  Serial.print("Connecting to Wi-Fi");
+  Serial.print("Connecting to WiFi");
   while (WiFi.status() != WL_CONNECTED) {
     Serial.print(".");
     delay(500);
   }
-  Serial.println("\nConnected to Wi-Fi");
+  Serial.println("\n✅ Connected to WiFi");
 
-  // Firebase configuration
+  // Setup Firebase
   config.api_key = API_KEY;
   config.database_url = DATABASE_URL;
-  auth.user.email = "testuser@gmail.com";     // dummy user
+  auth.user.email = "testuser@gmail.com";
   auth.user.password = "test1234";
 
-  config.token_status_callback = tokenStatusCallback;  // required
+  config.token_status_callback = tokenStatusCallback;
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
 
   if (Firebase.ready()) {
-    Serial.println("Firebase is ready");
+    Serial.println("✅ Firebase is ready");
   } else {
-    Serial.println("Firebase failed to initialize");
-    Serial.println(fbdo.errorReason());
+    Serial.println("❌ Firebase failed to initialize: " + fbdo.errorReason());
   }
 }
 
-// Function to get average distance
+// Function to measure distance (in cm)
 float measureDistance(int trigPin, int echoPin) {
   float total = 0;
   int valid = 0;
@@ -73,13 +72,13 @@ float measureDistance(int trigPin, int echoPin) {
     delayMicroseconds(10);
     digitalWrite(trigPin, LOW);
 
-    long duration = pulseIn(echoPin, HIGH, 30000);  // Timeout = 30ms
+    long duration = pulseIn(echoPin, HIGH, 30000);  // 30ms timeout
     if (duration > 0) {
-      float d = duration * 0.0343 / 2.0;
-      total += d;
+      float distance = duration * 0.0343 / 2.0;  // Convert to cm
+      total += distance;
       valid++;
     }
-    delay(10);  // short delay between samples
+    delay(10);
   }
 
   return (valid > 0) ? total / valid : -1.0;
@@ -97,18 +96,18 @@ void loop() {
       Serial.print(distances[i], 2);
       Serial.println(" cm");
 
-      // Send to Firebase
-      String path = "/ultrasonicSensors/" + String(sensorKeys[i]);
+      // Firebase path: /sensors/ultrasonic/frontLeft/status
+      String path = "/sensors/ultrasonic/" + String(sensorKeys[i]) + "/status";
       if (Firebase.RTDB.setFloat(&fbdo, path, distances[i])) {
-        Serial.println("Sent to Firebase: " + path + " = " + String(distances[i]));
+        Serial.println("✅ Sent to Firebase: " + path + " = " + String(distances[i]));
       } else {
-        Serial.println("Firebase Error: " + fbdo.errorReason());
+        Serial.println("❌ Firebase Error: " + fbdo.errorReason());
       }
     } else {
       Serial.println("Out of range");
     }
   }
 
-  Serial.println("--------------------------");
-  delay(500);  // delay between readings
+  Serial.println("-----------------------------");
+  delay(500);  // Read interval
 }

@@ -22,18 +22,21 @@
 DHT dht(DHTPIN, DHTTYPE);
 
 // Calibration constants for MQ-3 
-const float airValue = 200;       // Sensor reading in clean air
-const float alcoholValue = 4095;  // Max value under high concentration
+const float airValue = 200;
+const float alcoholValue = 4095;
 
-// Calibration constants for Ultrasonic Sensor 
+// Ultrasonic Sensor pins
 const int trigPins[2] = {12, 23};  
 const int echoPins[2] = {14, 21};
 const char* sensorKeys[2] = {"backLeft", "backRight"};
-
 const int numSensors = 2;
 const int numSamples = 5;
 float distances[2];
 
+// Firebase objects
+FirebaseData fbdo;
+FirebaseAuth auth;
+FirebaseConfig config;
 
 // Function to measure distance (in cm)
 float measureDistance(int trigPin, int echoPin) {
@@ -49,7 +52,7 @@ float measureDistance(int trigPin, int echoPin) {
 
     long duration = pulseIn(echoPin, HIGH, 30000);  // 30ms timeout
     if (duration > 0) {
-      float distance = duration * 0.0343 / 2.0;  // Convert to cm
+      float distance = duration * 0.0343 / 2.0;
       total += distance;
       valid++;
     }
@@ -59,12 +62,6 @@ float measureDistance(int trigPin, int echoPin) {
   return (valid > 0) ? total / valid : -1.0;
 }
 
-// Firebase objects
-FirebaseData fbdo;
-FirebaseAuth auth;
-FirebaseConfig config;
-
-
 void setup() {
   Serial.begin(115200);
 
@@ -73,9 +70,8 @@ void setup() {
   pinMode(MQ3_PIN, INPUT);
   
   dht.begin();
-  analogReadResolution(12); // Set ADC resolution (ESP32 default is 12-bit)
+  analogReadResolution(12);
 
-  // Initialize pins for Ultrasonic sensors
   for (int i = 0; i < numSensors; i++) {
     pinMode(trigPins[i], OUTPUT);
     pinMode(echoPins[i], INPUT);
@@ -119,7 +115,7 @@ void loop() {
 
   // === DHT11 SENSOR ===
   float humidity = dht.readHumidity();
-  float temperature = dht.readTemperature(); // Celsius
+  float temperature = dht.readTemperature(); 
   if (!isnan(humidity) && !isnan(temperature)) {
     Serial.printf("Humidity: %.2f %% | Temp: %.2f °C\n", humidity, temperature);
     Firebase.RTDB.setFloat(&fbdo, "/sensors/dht/humidity", humidity);
@@ -132,7 +128,6 @@ void loop() {
   int mq3Value = analogRead(MQ3_PIN);
   float alcoholPercentage = map(mq3Value, airValue, alcoholValue, 0, 100);
   alcoholPercentage = constrain(alcoholPercentage, 0, 100);
-
   Serial.printf("MQ-3 Raw: %d | Alcohol %%: %.2f %%\n", mq3Value, alcoholPercentage);
   Firebase.RTDB.setFloat(&fbdo, "/sensors/alcohol/percentage", alcoholPercentage);
   Firebase.RTDB.setInt(&fbdo, "/sensors/alcohol/raw", mq3Value);
@@ -141,23 +136,15 @@ void loop() {
   for (int i = 0; i < numSensors; i++) {
     distances[i] = measureDistance(trigPins[i], echoPins[i]);
 
-    Serial.print(sensorKeys[i]);
-    Serial.print(": ");
     if (distances[i] >= 0) {
-      Serial.print(distances[i], 2);
-      Serial.println(" cm");
-
       String path = "/sensors/ultrasonic/" + String(sensorKeys[i]) + "/status";
-      if (Firebase.RTDB.setFloat(&fbdo, path, distances[i])) {
-        Serial.println("✅ Sent to Firebase: " + path + " = " + String(distances[i]));
-      } else {
-        Serial.println("❌ Firebase Error: " + fbdo.errorReason());
-      }
+      Serial.printf("%s: %.2f cm\n", sensorKeys[i], distances[i]);
+      Firebase.RTDB.setFloat(&fbdo, path.c_str(), distances[i]);
     } else {
-      Serial.println("Out of range");
+      Serial.printf("%s: Out of range\n", sensorKeys[i]);
     }
   }
 
   Serial.println("-----------------------------");
-  delay(2000);  // Delay between updates
+  delay(2000);
 }

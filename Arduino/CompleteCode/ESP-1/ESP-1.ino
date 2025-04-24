@@ -17,17 +17,53 @@
 #define FLAME_SENSOR_ANALOG 34     
 #define DHTPIN 27  
 #define DHTTYPE DHT11
-#define MQ3_PIN 35   // Use a different ADC-capable pin than flame analog
+#define MQ3_PIN 35   
 
 DHT dht(DHTPIN, DHTTYPE);
 
-// Calibration constants for MQ-3 (you can fine-tune these)
+// Calibration constants for MQ-3 
 const float airValue = 200;       // Sensor reading in clean air
 const float alcoholValue = 4095;  // Max value under high concentration
 
+// Calibration constants for Ultrasonic Sensor 
+const int trigPins[2] = {12, 23};  
+const int echoPins[2] = {14, 21};
+const char* sensorKeys[2] = {"backLeft", "backRight"};
+
+const int numSensors = 2;
+const int numSamples = 5;
+float distances[2];
+
+
+// Function to measure distance (in cm)
+float measureDistance(int trigPin, int echoPin) {
+  float total = 0;
+  int valid = 0;
+
+  for (int i = 0; i < numSamples; i++) {
+    digitalWrite(trigPin, LOW);
+    delayMicroseconds(2);
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trigPin, LOW);
+
+    long duration = pulseIn(echoPin, HIGH, 30000);  // 30ms timeout
+    if (duration > 0) {
+      float distance = duration * 0.0343 / 2.0;  // Convert to cm
+      total += distance;
+      valid++;
+    }
+    delay(10);
+  }
+
+  return (valid > 0) ? total / valid : -1.0;
+}
+
+// Firebase objects
 FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
+
 
 void setup() {
   Serial.begin(115200);
@@ -35,9 +71,15 @@ void setup() {
   pinMode(FLAME_SENSOR_DIGITAL, INPUT);
   pinMode(FLAME_SENSOR_ANALOG, INPUT);
   pinMode(MQ3_PIN, INPUT);
-
+  
   dht.begin();
   analogReadResolution(12); // Set ADC resolution (ESP32 default is 12-bit)
+
+  // Initialize pins for Ultrasonic sensors
+  for (int i = 0; i < numSensors; i++) {
+    pinMode(trigPins[i], OUTPUT);
+    pinMode(echoPins[i], INPUT);
+  }
 
   // Connect to Wi-Fi
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -95,5 +137,27 @@ void loop() {
   Firebase.RTDB.setFloat(&fbdo, "/sensors/alcohol/percentage", alcoholPercentage);
   Firebase.RTDB.setInt(&fbdo, "/sensors/alcohol/raw", mq3Value);
 
+  // === ULTRASONIC SENSORS ===
+  for (int i = 0; i < numSensors; i++) {
+    distances[i] = measureDistance(trigPins[i], echoPins[i]);
+
+    Serial.print(sensorKeys[i]);
+    Serial.print(": ");
+    if (distances[i] >= 0) {
+      Serial.print(distances[i], 2);
+      Serial.println(" cm");
+
+      String path = "/sensors/ultrasonic/" + String(sensorKeys[i]) + "/status";
+      if (Firebase.RTDB.setFloat(&fbdo, path, distances[i])) {
+        Serial.println("✅ Sent to Firebase: " + path + " = " + String(distances[i]));
+      } else {
+        Serial.println("❌ Firebase Error: " + fbdo.errorReason());
+      }
+    } else {
+      Serial.println("Out of range");
+    }
+  }
+
+  Serial.println("-----------------------------");
   delay(2000);  // Delay between updates
 }

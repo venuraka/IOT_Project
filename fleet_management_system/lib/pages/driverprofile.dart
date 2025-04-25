@@ -1,218 +1,209 @@
-import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:firebase_database/firebase_database.dart';
 
+class DriverProfile extends StatefulWidget {
+  final Map<String, String> driverData;
 
-class DriverProfile extends StatelessWidget {
-  final String driverId;
-  final String driverName;
+  const DriverProfile({required this.driverData});
 
-  const DriverProfile({super.key, required this.driverId, required this.driverName});
+  @override
+  State<DriverProfile> createState() => _DriverProfileState();
+}
+
+class _DriverProfileState extends State<DriverProfile> {
+  @override
+  void initState() {
+    print('Driver Data: ${widget.driverData}');
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Reference to the specific driver's data in Firebase
-    final databaseRef = FirebaseDatabase.instance.ref().child('DataSet/Drivers/$driverId');
-
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: PreferredSize(
-  preferredSize: Size.fromHeight(70),
-  child: AppBar(
-    backgroundColor: const Color(0xFF184A8C),
-    leading: Padding(
-      padding: const EdgeInsets.only(top: 15.0), // top margin for back button
-      child: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.white),
-        onPressed: () => Navigator.pop(context),
-      ),
-    ),
-    title: Padding(
-      padding: const EdgeInsets.only(top: 15.0), // top margin for title
-      child: Text(
-        "Driver Details",
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.2,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF003366),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
         ),
+        title: const Text("Driver Details", style: TextStyle(color: Colors.white)),
       ),
-    ),
-  ),
-),
-
-      body: StreamBuilder(
-        stream: databaseRef.onValue,
-        builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
-          // Handle loading state
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          // Handle errors
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-          // Handle no data
-          if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
-            return const Center(child: Text('Driver data not found'));
-          }
-
-          // Extract driver data
-          final driverData = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
-          final address = driverData['address']?.toString() ?? 'Not provided';
-          final birthday = driverData['birthday']?.toString() ?? 'Not provided';
-          final gender = driverData['gender']?.toString() ?? 'Not provided';
-          final number = driverData['number']?.toString() ?? 'Not provided';
-          final vehicle = driverData['vehicle']?.toString() ?? 'Not provided';
-          final picUrl = driverData['pic']?.toString() ?? '';
-
-          // Extract OBDdata
-          final obdData = driverData['OBDdata'] as Map<dynamic, dynamic>? ?? {};
-          print('OBD Data: $obdData');
-          final vibration = obdData['Vibration']?.toString() ?? 'Not available';
-          final humidity = obdData['Humidity']?.toString() ?? 'Not available';
-          final remainingFuel = obdData['Remaining Fule']?.toString() ?? 'Not available';
-          final temperature = obdData['Temperture']?.toString() ?? 'Not available';
-          final speed = obdData['Speed']?.toString() ?? 'Not available';
-          final fuelConsumption = obdData['Fuel Consumption']?.toString() ?? 'Not available';
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF003366),
-                    borderRadius: BorderRadius.circular(12),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Profile Info Section
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF003366),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const CircleAvatar(
+                    radius: 40,
+                    backgroundImage: AssetImage('images/login2.png'),
                   ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Profile Picture
-                      Padding(
-                        padding: const EdgeInsets.only(top: 9, left: 5),
-                        child: CircleAvatar(
-                          radius: 40,
-                          backgroundImage: picUrl.isNotEmpty
-                              ? NetworkImage(picUrl)
-                              : const AssetImage('images/login2.png') as ImageProvider,
-                          onBackgroundImageError: (_, __) => const AssetImage('images/login2.png'),
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        flex: 2,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(top: 15),
-                              child: Text(
-                                driverName,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              address,
-                              style: const TextStyle(color: Colors.white70),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 20),
-                          child: Wrap(
-                            spacing: 20,
-                            runSpacing: 10,
-                            children: [
-                              _ProfileInfo(title: "Contact Number", value: number),
-                              _ProfileInfo(title: "Birth Day", value: birthday),
-                              _ProfileInfo(title: "Assigned Vehicle", value: vehicle),
-                              _ProfileInfo(title: "Gender", value: gender),
-                            ],
+                  const SizedBox(width: 20),
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.driverData['name'] ?? 'Nick Harreled',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 30),
-                // Sensor Data and Map
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 1,
-                      child: Container(
-                        height: 470,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF003366),
-                          borderRadius: BorderRadius.circular(12),
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.driverData['address'] ??
+                              '184/188 2nd Cross Street 11, Colombo\nSri Lanka',
+                          style: const TextStyle(color: Colors.white70),
                         ),
-                        child: Wrap(
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Wrap(
+                      spacing: 20,
+                      runSpacing: 10,
+                      children: [
+                        _ProfileInfo(
+                          title: 'Contact Number',
+                          value: widget.driverData['contact'] ?? '+94 775443456',
+                        ),
+                        _ProfileInfo(
+                          title: 'Birth Day',
+                          value: widget.driverData['birthday'] ?? '2000/01/12',
+                        ),
+                        _ProfileInfo(
+                          title: 'Assigned Vehicle',
+                          value: widget.driverData['vehicle'] ?? 'CHS - 7752',
+                        ),
+                        _ProfileInfo(
+                          title: 'Gender',
+                          value: widget.driverData['gender'] ?? 'Male',
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 30),
+            // Sensor Data and Map
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 1,
+                  child: Container(
+                    height: 470,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF003366),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: StreamBuilder<DatabaseEvent>(
+                      stream: FirebaseDatabase.instance.ref('sensors').onValue,
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return const Center(
+                              child: Text('Error loading sensor data',
+                                  style: TextStyle(color: Colors.white)));
+                        }
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        final data = snapshot.data?.snapshot.value as Map<dynamic, dynamic>?;
+                        if (data == null) {
+                          return const Center(
+                              child: Text('No sensor data available',
+                                  style: TextStyle(color: Colors.white)));
+                        }
+                        // Map the fetched data to the UI cards
+                        final alcoholPercentage = data['alcohol']?['percentage']?.toString() ?? 'N/A';
+                        final dhtHumidity = data['dht']?['humidity']?.toString() ?? 'N/A';
+                        final dhtTemperature = data['dht']?['temperature']?.toString() ?? 'N/A';
+                        final flameStatus = data['flame']?['status']?.toString() ?? 'N/A';
+                        final mq135Status = data['mq135']?['status']?.toString() ?? 'N/A';
+                        final ultrasonicBackLeft = data['ultrasonic']?['backLeft']?['status']?.toString() ?? 'N/A';
+                        final ultrasonicFrontLeft = data['ultrasonic']?['frontLeft']?['status']?.toString() ?? 'N/A';
+                        final ultrasonicFrontRight = data['ultrasonic']?['frontRight']?['status']?.toString() ?? 'N/A';
+                        final vibrationCount = data['vibration']?['count']?.toString() ?? 'N/A';
+
+                        return Wrap(
                           spacing: 16,
                           runSpacing: 16,
                           children: [
-                            _InfoCard(title: "Vibration", value: vibration, isDark: true),
-                            _InfoCard(title: "Humidity", value: humidity, isDark: true),
-                            _InfoCard(title: "Remaining Fuel", value: remainingFuel, isDark: true),
-                            _InfoCard(title: "Temperature", value: temperature, isDark: true),
-                            _InfoCard(title: "Speed", value: speed, isDark: true),
-                            _InfoCard(title: "Fuel Consumption", value: fuelConsumption, isDark: true),
+                            _InfoCard(
+                                title: 'alcohol > percentage',
+                                value: '$alcoholPercentage%',
+                                isDark: true),
+                            _InfoCard(
+                                title: 'dht > Humidity',
+                                value: '$dhtHumidity%',
+                                isDark: true),
+                            _InfoCard(
+                                title: 'dht > Temperature',
+                                value: '$dhtTemperature°C',
+                                isDark: true),
+                            _InfoCard(
+                                title: 'flame > status',
+                                value: flameStatus,
+                                isDark: true),
+                            _InfoCard(
+                                title: 'mq135 > status',
+                                value: mq135Status,
+                                isDark: true),
+                            _InfoCard(
+                                title: 'USonic > backLeft > Status',
+                                value: ultrasonicBackLeft,
+                                isDark: true),
+                            _InfoCard(
+                                title: 'USonic > frontleft > Status',
+                                value: ultrasonicFrontLeft,
+                                isDark: true),
+                            _InfoCard(
+                                title: 'USonic > frontRight > Status',
+                                value: ultrasonicFrontRight,
+                                isDark: true),
+                            _InfoCard(
+                                title: 'Vibration > Count',
+                                value: vibrationCount,
+                                isDark: true),
                           ],
-                        ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Container(
+                    height: 470,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      image: const DecorationImage(
+                        image: AssetImage('images/login2.png'),
+                        fit: BoxFit.cover,
                       ),
                     ),
-                    const SizedBox(width: 20),
-                    // Map Container
-                    Expanded(
-                      child: Container(
-                        height: 470,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: FlutterMap(
-                          options: const MapOptions(
-                            initialCenter: LatLng(7.8731, 80.7718), // Sri Lanka
-                            initialZoom: 8.0,
-                          ),
-                          children: [
-                            TileLayer(
-                              urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                              subdomains: const ['a', 'b', 'c'],
-                            ),
-                            MarkerLayer(
-                              markers: [
-                                Marker(
-                                  point: const LatLng(7.8731, 80.7718),
-                                  width: 40,
-                                  height: 40,
-                                  child: const Icon(Icons.location_on, color: Colors.red, size: 40),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }
@@ -233,7 +224,8 @@ class _ProfileInfo extends StatelessWidget {
         children: [
           Text(title, style: const TextStyle(color: Colors.white70, fontSize: 12)),
           const SizedBox(height: 4),
-          Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          Text(value,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         ],
       ),
     );

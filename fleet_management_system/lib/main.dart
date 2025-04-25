@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'Pages/login.dart';
 import 'Pages/dashboard.dart';
-// import 'Pages/driverprofile.dart';
+import 'Pages/driverprofile.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 

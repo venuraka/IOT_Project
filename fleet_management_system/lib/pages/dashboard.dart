@@ -1,26 +1,57 @@
-import 'package:web_project/services/auth_service.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import 'driverprofile.dart';
-import 'login.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'driverprofile.dart'; // Import the DriverProfile page
 
-class DashboardPage extends StatelessWidget {
+class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Reference to the Firebase database
-    // This is where the driver data is stored
-    final databaseRef = FirebaseDatabase.instance.ref().child('DataSet/Drivers');
+  _DashboardPageState createState() => _DashboardPageState();
+}
 
+class _DashboardPageState extends State<DashboardPage> {
+  List<DocumentSnapshot> _drivers = [];
+  bool _isLoading = true;
+  String _error = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDrivers();
+  }
+
+  Future<void> _fetchDrivers() async {
+    setState(() {
+      _isLoading = true;
+      _error = '';
+    });
+    try {
+      print('Fetching drivers from Firestore...');
+      final snapshot = await FirebaseFirestore.instance.collection('Drivers').get();
+      print('Fetched ${snapshot.docs.length} drivers');
+      setState(() {
+        _drivers = snapshot.docs;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error fetching drivers: $e');
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFEFF2F7),
       body: SafeArea(
         child: Column(
           children: [
-            // Header with title and logout button
+            // Header
             Container(
-                color: const Color(0xFF184A8C),
+              color: const Color(0xFF184A8C),
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               child: Row(
@@ -37,18 +68,8 @@ class DashboardPage extends StatelessWidget {
                   ),
                   const Spacer(),
                   TextButton.icon(
-                    onPressed: () async {
-                      try {
-                        await authServiceNotifier.value?.signOut(); // Firebase sign out
-                        Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(builder: (context) => LoginPage()),
-                          (route) => false,
-                        ); // Go to login and clear stack
-                      } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Logout failed: $e')),
-                        );
-                      }
+                    onPressed: () {
+                      Navigator.pop(context);
                     },
                     icon: const Icon(Icons.logout, color: Colors.white),
                     label: const Text(
@@ -60,17 +81,12 @@ class DashboardPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            // Section title
             const Text(
               "View Drivers Here",
-              style: TextStyle(
-                color: Color(0xFF184A8C),
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-              ),
+              style: TextStyle(color: Color(0xFF184A8C), fontWeight: FontWeight.bold, fontSize: 20),
             ),
             const SizedBox(height: 16),
-            // Table header for driver list
+            // Table Header
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Container(
@@ -102,51 +118,34 @@ class DashboardPage extends StatelessWidget {
                 ),
               ),
             ),
-            // Dynamic list of drivers fetched from Firebase
-            // This will update in real-time as data changes
+            // Driver List
             Expanded(
-              child: StreamBuilder(
-                stream: databaseRef.onValue,
-                builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
-                  // Show loading indicator while waiting for data
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  // Handle errors
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  }
-                  // Handle no data or null value
-                  if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
-                    return const Center(child: Text('No drivers found'));
-                  }
-
-                  // Cast the data to a Map
-                  final driversMap = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
-                  final driversList = driversMap.entries.map((entry) {
-                    final driverId = entry.key.toString();
-                    final driverData = entry.value as Map<dynamic, dynamic>;
-                    return {
-                      'id': driverId,
-                      'name': driverData['name']?.toString() ?? 'Unknown',
-                      'status': driverData['status']?.toString() ?? 'Unknown',
-                    };
-                  }).toList();
-
-                  // Build the ListView dynamically
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    itemCount: driversList.length,
-                    itemBuilder: (context, index) {
-                      final driver = driversList[index];
-                      return driverRow(
-                        context,
-                        driver['id']!,
-                        driver['name']!,
-                        driver['status']!,
-                      );
-                    },
-                  );
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error.isNotEmpty
+                  ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('Error: $_error'),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _fetchDrivers,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              )
+                  : _drivers.isEmpty
+                  ? const Center(child: Text('No drivers found'))
+                  : ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                itemCount: _drivers.length,
+                itemBuilder: (context, index) {
+                  final driver = _drivers[index];
+                  final name = driver['name'] as String? ?? 'Unknown';
+                  final status = driver['dstatus'] as String? ?? 'Unknown';
+                  return driverRow(context, name, status, driver);
                 },
               ),
             ),
@@ -156,7 +155,7 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  Widget driverRow(BuildContext context, String driverId, String name, String status) {
+  Widget driverRow(BuildContext context, String name, String status, DocumentSnapshot driver) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
@@ -188,14 +187,20 @@ class DashboardPage extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
               onPressed: () {
-
+                print(driver);
+                final driverData = {
+                  'name': driver['name'] as String? ?? 'Unknown',
+                  'address': driver['daddress'] as String? ?? 'Not provided',
+                  'contact': (driver['dcontactnumber'] as num?)?.toString() ?? 'Not provided',
+                  'birthday': driver['dbirthday'] as String? ?? 'Not provided',
+                  'vehicle': driver['dvehicle'] as String? ?? 'Not provided',
+                  'gender': driver['dgender'] as String? ?? 'Not provided',
+                };
+                // Navigate using MaterialPageRoute
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => DriverProfile(
-                      driverId: driverId,
-                      driverName: name,
-                    ),
+                    builder: (context) => DriverProfile(driverData: driverData),
                   ),
                 );
               },

@@ -71,29 +71,32 @@ class _DriverProfileState extends State<DriverProfile> {
                       ],
                     ),
                   ),
-                  Expanded(
-                    flex: 2,
-                    child: Wrap(
-                      spacing: 20,
-                      runSpacing: 10,
-                      children: [
-                        _ProfileInfo(
-                          title: 'Contact Number',
-                          value: widget.driverData['contact'] ?? '+94 775443456',
-                        ),
-                        _ProfileInfo(
-                          title: 'Birth Day',
-                          value: widget.driverData['birthday'] ?? '2000/01/12',
-                        ),
-                        _ProfileInfo(
-                          title: 'Assigned Vehicle',
-                          value: widget.driverData['vehicle'] ?? 'CHS - 7752',
-                        ),
-                        _ProfileInfo(
-                          title: 'Gender',
-                          value: widget.driverData['gender'] ?? 'Male',
-                        ),
-                      ],
+                  Padding(
+                    padding: const EdgeInsets.only(top: 15),
+                    child: Expanded(
+                      flex: 2,
+                      child: Wrap(
+                        spacing: 20,
+                        runSpacing: 10,
+                        children: [
+                          _ProfileInfo(
+                            title: 'Contact Number',
+                            value: widget.driverData['contact'] ?? '+94 775443456',
+                          ),
+                          _ProfileInfo(
+                            title: 'Birth Day',
+                            value: widget.driverData['birthday'] ?? '2000/01/12',
+                          ),
+                          _ProfileInfo(
+                            title: 'Assigned Vehicle',
+                            value: widget.driverData['vehicle'] ?? 'CHS - 7752',
+                          ),
+                          _ProfileInfo(
+                            title: 'Gender',
+                            value: widget.driverData['gender'] ?? 'Male',
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -130,57 +133,65 @@ class _DriverProfileState extends State<DriverProfile> {
                               child: Text('No sensor data available',
                                   style: TextStyle(color: Colors.white)));
                         }
+
                         // Map the fetched data to the UI cards
                         final alcoholPercentage = data['alcohol']?['percentage']?.toString() ?? 'N/A';
                         final dhtHumidity = data['dht']?['humidity']?.toString() ?? 'N/A';
                         final dhtTemperature = data['dht']?['temperature']?.toString() ?? 'N/A';
                         final flameStatus = data['flame']?['status']?.toString() ?? 'N/A';
-                        final mq135Status = data['mq135']?['status']?.toString() ?? 'N/A';
+                        final mq135Status = data['mq135']?['rawValue']?.toString() ?? 'N/A';
+                        final vibrationCount = data['vibration']?['count']?.toString() ?? 'N/A';
                         final ultrasonicBackLeft = data['ultrasonic']?['backLeft']?['status']?.toString() ?? 'N/A';
                         final ultrasonicFrontLeft = data['ultrasonic']?['frontLeft']?['status']?.toString() ?? 'N/A';
                         final ultrasonicFrontRight = data['ultrasonic']?['frontRight']?['status']?.toString() ?? 'N/A';
-                        final vibrationCount = data['vibration']?['count']?.toString() ?? 'N/A';
+                        final ultrasonicBackRight = data['ultrasonic']?['backRight']?['status']?.toString() ?? 'N/A';
+
 
                         return Wrap(
                           spacing: 16,
                           runSpacing: 16,
                           children: [
                             _InfoCard(
-                                title: 'alcohol > percentage',
+                                title: 'Alcohol Percentage',
                                 value: '$alcoholPercentage%',
                                 isDark: true),
                             _InfoCard(
-                                title: 'dht > Humidity',
+                                title: 'Humidity',
                                 value: '$dhtHumidity%',
                                 isDark: true),
                             _InfoCard(
-                                title: 'dht > Temperature',
+                                title: 'Temperature',
                                 value: '$dhtTemperature°C',
                                 isDark: true),
                             _InfoCard(
-                                title: 'flame > status',
+                                title: 'Fire Status',
                                 value: flameStatus,
                                 isDark: true),
                             _InfoCard(
-                                title: 'mq135 > status',
+                                title: 'Smoke Status',
                                 value: mq135Status,
                                 isDark: true),
                             _InfoCard(
-                                title: 'USonic > backLeft > Status',
+                                title: 'Vibration',
+                                value: vibrationCount,
+                                isDark: true),
+                            _InfoCard(
+                                title: 'BackLeft Distance',
                                 value: ultrasonicBackLeft,
                                 isDark: true),
                             _InfoCard(
-                                title: 'USonic > frontleft > Status',
+                                title: 'Frontleft Distance',
                                 value: ultrasonicFrontLeft,
                                 isDark: true),
                             _InfoCard(
-                                title: 'USonic > frontRight > Status',
+                                title: 'FrontRight Distance',
                                 value: ultrasonicFrontRight,
                                 isDark: true),
                             _InfoCard(
-                                title: 'Vibration > Count',
-                                value: vibrationCount,
+                                title: 'FrontLeft Distance',
+                                value: ultrasonicBackRight,
                                 isDark: true),
+                            
                           ],
                         );
                       },

@@ -27,7 +27,10 @@ class _DriverProfileState extends State<DriverProfile> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text("Driver Details", style: TextStyle(color: Colors.white)),
+        title: const Text(
+          "Driver Details",
+          style: TextStyle(color: Colors.white),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -81,11 +84,13 @@ class _DriverProfileState extends State<DriverProfile> {
                         children: [
                           _ProfileInfo(
                             title: 'Contact Number',
-                            value: widget.driverData['contact'] ?? '+94 775443456',
+                            value:
+                                widget.driverData['contact'] ?? '+94 775443456',
                           ),
                           _ProfileInfo(
                             title: 'Birth Day',
-                            value: widget.driverData['birthday'] ?? '2000/01/12',
+                            value:
+                                widget.driverData['birthday'] ?? '2000/01/12',
                           ),
                           _ProfileInfo(
                             title: 'Assigned Vehicle',
@@ -121,77 +126,143 @@ class _DriverProfileState extends State<DriverProfile> {
                       builder: (context, snapshot) {
                         if (snapshot.hasError) {
                           return const Center(
-                              child: Text('Error loading sensor data',
-                                  style: TextStyle(color: Colors.white)));
+                            child: Text(
+                              'Error loading sensor data',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          );
                         }
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
                         }
-                        final data = snapshot.data?.snapshot.value as Map<dynamic, dynamic>?;
+                        final data =
+                            snapshot.data?.snapshot.value
+                                as Map<dynamic, dynamic>?;
                         if (data == null) {
                           return const Center(
-                              child: Text('No sensor data available',
-                                  style: TextStyle(color: Colors.white)));
+                            child: Text(
+                              'No sensor data available',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          );
                         }
 
                         // Map the fetched data to the UI cards
-                        final alcoholPercentage = data['alcohol']?['percentage']?.toString() ?? 'N/A';
-                        final dhtHumidity = data['dht']?['humidity']?.toString() ?? 'N/A';
-                        final dhtTemperature = data['dht']?['temperature']?.toString() ?? 'N/A';
-                        final flameStatus = data['flame']?['status']?.toString() ?? 'N/A';
-                        final mq135Status = data['mq135']?['rawValue']?.toString() ?? 'N/A';
-                        final vibrationCount = data['vibration']?['count']?.toString() ?? 'N/A';
-                        final ultrasonicBackLeft = data['ultrasonic']?['backLeft']?['status']?.toString() ?? 'N/A';
-                        final ultrasonicFrontLeft = data['ultrasonic']?['frontLeft']?['status']?.toString() ?? 'N/A';
-                        final ultrasonicFrontRight = data['ultrasonic']?['frontRight']?['status']?.toString() ?? 'N/A';
-                        final ultrasonicBackRight = data['ultrasonic']?['backRight']?['status']?.toString() ?? 'N/A';
+                        final alcoholRaw = data['alcohol']?['percentage'];
+                        final alcoholPercentage =
+                            alcoholRaw?.toString() ?? 'N/A';
+                        final isAlcoholHigh =
+                            alcoholRaw != null &&
+                            double.tryParse(alcoholRaw.toString()) != null &&
+                            double.parse(alcoholRaw.toString()) > 0.08;
 
+                        // Show alert if alcohol is too high
+                        if (isAlcoholHigh) {
+                          Future.microtask(() {
+                            showDialog(
+                              context: context,
+                              builder:
+                                  (context) => AlertDialog(
+                                    title: const Text('Warning!'),
+                                    content: const Text(
+                                      'High alcohol level detected!',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text('OK'),
+                                      ),
+                                    ],
+                                  ),
+                            );
+                          });
+                        }
+
+                        final dhtHumidity =
+                            data['dht']?['humidity']?.toString() ?? 'N/A';
+                        final dhtTemperature =
+                            data['dht']?['temperature']?.toString() ?? 'N/A';
+                        final flameStatus =
+                            data['flame']?['status']?.toString() ?? 'N/A';
+                        final mq135Status =
+                            data['mq135']?['rawValue']?.toString() ?? 'N/A';
+                        final vibrationCount =
+                            data['vibration']?['count']?.toString() ?? 'N/A';
+                        final ultrasonicBackLeft =
+                            data['ultrasonic']?['backLeft']?['status']
+                                ?.toString() ??
+                            'N/A';
+                        final ultrasonicFrontLeft =
+                            data['ultrasonic']?['frontLeft']?['status']
+                                ?.toString() ??
+                            'N/A';
+                        final ultrasonicFrontRight =
+                            data['ultrasonic']?['frontRight']?['status']
+                                ?.toString() ??
+                            'N/A';
+                        final ultrasonicBackRight =
+                            data['ultrasonic']?['backRight']?['status']
+                                ?.toString() ??
+                            'N/A';
 
                         return Wrap(
                           spacing: 16,
                           runSpacing: 16,
                           children: [
                             _InfoCard(
-                                title: 'Alcohol Percentage',
-                                value: '$alcoholPercentage%',
-                                isDark: true),
+                              title: 'Alcohol Percentage',
+                              value: '$alcoholPercentage%',
+                              isDark: true,
+                              isWarning: isAlcoholHigh,
+                            ),
                             _InfoCard(
-                                title: 'Humidity',
-                                value: '$dhtHumidity%',
-                                isDark: true),
+                              title: 'Humidity',
+                              value: '$dhtHumidity%',
+                              isDark: true,
+                            ),
                             _InfoCard(
-                                title: 'Temperature',
-                                value: '$dhtTemperature°C',
-                                isDark: true),
+                              title: 'Temperature',
+                              value: '$dhtTemperature°C',
+                              isDark: true,
+                            ),
                             _InfoCard(
-                                title: 'Fire Status',
-                                value: flameStatus,
-                                isDark: true),
+                              title: 'Fire Status',
+                              value: flameStatus,
+                              isDark: true,
+                            ),
                             _InfoCard(
-                                title: 'Smoke Status',
-                                value: mq135Status,
-                                isDark: true),
+                              title: 'Smoke Status',
+                              value: mq135Status,
+                              isDark: true,
+                            ),
                             _InfoCard(
-                                title: 'Vibration',
-                                value: vibrationCount,
-                                isDark: true),
+                              title: 'Vibration',
+                              value: vibrationCount,
+                              isDark: true,
+                            ),
                             _InfoCard(
-                                title: 'BackLeft Distance',
-                                value: ultrasonicBackLeft,
-                                isDark: true),
+                              title: 'BackLeft Distance',
+                              value: ultrasonicBackLeft,
+                              isDark: true,
+                            ),
                             _InfoCard(
-                                title: 'Frontleft Distance',
-                                value: ultrasonicFrontLeft,
-                                isDark: true),
+                              title: 'Frontleft Distance',
+                              value: ultrasonicFrontLeft,
+                              isDark: true,
+                            ),
                             _InfoCard(
-                                title: 'FrontRight Distance',
-                                value: ultrasonicFrontRight,
-                                isDark: true),
+                              title: 'FrontRight Distance',
+                              value: ultrasonicFrontRight,
+                              isDark: true,
+                            ),
                             _InfoCard(
-                                title: 'FrontLeft Distance',
-                                value: ultrasonicBackRight,
-                                isDark: true),
-                            
+                              title: 'FrontLeft Distance',
+                              value: ultrasonicBackRight,
+                              isDark: true,
+                            ),
                           ],
                         );
                       },
@@ -233,10 +304,18 @@ class _ProfileInfo extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          Text(
+            title,
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
           const SizedBox(height: 4),
-          Text(value,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );
@@ -247,8 +326,14 @@ class _InfoCard extends StatelessWidget {
   final String title;
   final String value;
   final bool isDark;
+  final bool isWarning; // << Added
 
-  const _InfoCard({required this.title, required this.value, this.isDark = false});
+  const _InfoCard({
+    required this.title,
+    required this.value,
+    this.isDark = false,
+    this.isWarning = false, // << Added
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -274,7 +359,12 @@ class _InfoCard extends StatelessWidget {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : Colors.black,
+              color:
+                  isWarning
+                      ? Colors.redAccent
+                      : isDark
+                      ? Colors.white
+                      : Colors.black,
             ),
           ),
         ],

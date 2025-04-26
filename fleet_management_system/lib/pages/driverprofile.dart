@@ -11,6 +11,11 @@ class DriverProfile extends StatefulWidget {
 }
 
 class _DriverProfileState extends State<DriverProfile> {
+  double? tempThreshold;
+  double? humidityThreshold;
+  bool tempAlertShown = false;
+  bool humidityAlertShown = false;
+
   @override
   void initState() {
     print('Driver Data: ${widget.driverData}');
@@ -121,151 +126,290 @@ class _DriverProfileState extends State<DriverProfile> {
                       color: const Color(0xFF003366),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: StreamBuilder<DatabaseEvent>(
-                      stream: FirebaseDatabase.instance.ref('sensors').onValue,
-                      builder: (context, snapshot) {
-                        if (snapshot.hasError) {
-                          return const Center(
-                            child: Text(
-                              'Error loading sensor data',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          );
-                        }
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        }
-                        final data =
-                            snapshot.data?.snapshot.value
-                                as Map<dynamic, dynamic>?;
-                        if (data == null) {
-                          return const Center(
-                            child: Text(
-                              'No sensor data available',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          );
-                        }
+                    child: Stack(
+                      children: [
+                        StreamBuilder<DatabaseEvent>(
+                          stream:
+                              FirebaseDatabase.instance.ref('sensors').onValue,
+                          builder: (context, snapshot) {
+                            if (snapshot.hasError) {
+                              return const Center(
+                                child: Text(
+                                  'Error loading sensor data',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              );
+                            }
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+                            final data =
+                                snapshot.data?.snapshot.value
+                                    as Map<dynamic, dynamic>?;
+                            if (data == null) {
+                              return const Center(
+                                child: Text(
+                                  'No sensor data available',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              );
+                            }
 
-                        // Map the fetched data to the UI cards
-                        final alcoholRaw = data['alcohol']?['percentage'];
-                        final alcoholPercentage =
-                            alcoholRaw?.toString() ?? 'N/A';
-                        final isAlcoholHigh =
-                            alcoholRaw != null &&
-                            double.tryParse(alcoholRaw.toString()) != null &&
-                            double.parse(alcoholRaw.toString()) > 0.08;
+                            // Alcohol
+                            final alcoholRaw = data['alcohol']?['percentage'];
+                            final alcoholPercentage =
+                                alcoholRaw?.toString() ?? 'N/A';
+                            final isAlcoholHigh =
+                                alcoholRaw != null &&
+                                double.tryParse(alcoholRaw.toString()) !=
+                                    null &&
+                                double.parse(alcoholRaw.toString()) > 0.08;
 
-                        // Show alert if alcohol is too high
-                        if (isAlcoholHigh) {
-                          Future.microtask(() {
-                            showDialog(
-                              context: context,
-                              builder:
-                                  (context) => AlertDialog(
-                                    title: const Text('Warning!'),
-                                    content: const Text(
-                                      'High alcohol level detected!',
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text('OK'),
+                            if (isAlcoholHigh) {
+                              Future.microtask(() {
+                                showDialog(
+                                  context: context,
+                                  builder:
+                                      (context) => AlertDialog(
+                                        title: const Text('Warning!'),
+                                        content: const Text(
+                                          'High alcohol level detected!',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed:
+                                                () => Navigator.pop(context),
+                                            child: const Text('OK'),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
+                                );
+                              });
+                            }
+
+                            // Humidity and Temperature
+                            final dhtHumidity =
+                                data['dht']?['humidity']?.toString() ?? 'N/A';
+                            final dhtTemperature =
+                                data['dht']?['temperature']?.toString() ??
+                                'N/A';
+
+                            final tempVal = double.tryParse(dhtTemperature);
+                            final humidityVal = double.tryParse(dhtHumidity);
+
+                            final isTempWarning =
+                                tempThreshold != null &&
+                                tempVal != null &&
+                                (tempVal > tempThreshold! ||
+                                    tempVal < tempThreshold! - 5);
+
+                            final isHumidityWarning =
+                                humidityThreshold != null &&
+                                humidityVal != null &&
+                                (humidityVal > humidityThreshold! ||
+                                    humidityVal < humidityThreshold! - 5);
+
+                            // Temperature Alert
+                            if (isTempWarning && !tempAlertShown) {
+                              tempAlertShown = true;
+                              Future.microtask(() {
+                                showDialog(
+                                  context: context,
+                                  builder:
+                                      (context) => AlertDialog(
+                                        title: const Text(
+                                          'Temperature Warning!',
+                                        ),
+                                        content: Text(
+                                          'Temperature is out of safe range! (Set: ${tempThreshold}°C)',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed:
+                                                () => Navigator.pop(context),
+                                            child: const Text('OK'),
+                                          ),
+                                        ],
+                                      ),
+                                );
+                              });
+                            } else if (!isTempWarning) {
+                              tempAlertShown = false;
+                            }
+
+                            // Humidity Alert
+                            if (isHumidityWarning && !humidityAlertShown) {
+                              humidityAlertShown = true;
+                              Future.microtask(() {
+                                showDialog(
+                                  context: context,
+                                  builder:
+                                      (context) => AlertDialog(
+                                        title: const Text('Humidity Warning!'),
+                                        content: Text(
+                                          'Humidity is out of safe range! (Set: ${humidityThreshold}%)',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed:
+                                                () => Navigator.pop(context),
+                                            child: const Text('OK'),
+                                          ),
+                                        ],
+                                      ),
+                                );
+                              });
+                            } else if (!isHumidityWarning) {
+                              humidityAlertShown = false;
+                            }
+
+                            final flameStatus =
+                                data['flame']?['status']?.toString() ?? 'N/A';
+                            final mq135Status =
+                                data['mq135']?['rawValue']?.toString() ?? 'N/A';
+                            final vibrationCount =
+                                data['vibration']?['count']?.toString() ??
+                                'N/A';
+                            final ultrasonicBackLeft =
+                                data['ultrasonic']?['backLeft']?['status']
+                                    ?.toString() ??
+                                'N/A';
+                            final ultrasonicFrontLeft =
+                                data['ultrasonic']?['frontLeft']?['status']
+                                    ?.toString() ??
+                                'N/A';
+                            final ultrasonicFrontRight =
+                                data['ultrasonic']?['frontRight']?['status']
+                                    ?.toString() ??
+                                'N/A';
+                            final ultrasonicBackRight =
+                                data['ultrasonic']?['backRight']?['status']
+                                    ?.toString() ??
+                                'N/A';
+
+                            return Wrap(
+                              spacing: 16,
+                              runSpacing: 16,
+                              children: [
+                                _InfoCard(
+                                  title: 'Alcohol Percentage',
+                                  value: '$alcoholPercentage%',
+                                  isDark: true,
+                                  isWarning: isAlcoholHigh,
+                                ),
+                                _InfoCard(
+                                  title: 'Humidity',
+                                  value: '$dhtHumidity%',
+                                  isDark: true,
+                                  isWarning: isHumidityWarning,
+                                ),
+                                _InfoCard(
+                                  title: 'Temperature',
+                                  value: '$dhtTemperature°C',
+                                  isDark: true,
+                                  isWarning: isTempWarning,
+                                ),
+                                _InfoCard(
+                                  title: 'Fire Status',
+                                  value: flameStatus,
+                                  isDark: true,
+                                ),
+                                _InfoCard(
+                                  title: 'Smoke Status',
+                                  value: mq135Status,
+                                  isDark: true,
+                                ),
+                                _InfoCard(
+                                  title: 'Vibration',
+                                  value: vibrationCount,
+                                  isDark: true,
+                                ),
+                                _InfoCard(
+                                  title: 'BackLeft Distance',
+                                  value: ultrasonicBackLeft,
+                                  isDark: true,
+                                ),
+                                _InfoCard(
+                                  title: 'FrontLeft Distance',
+                                  value: ultrasonicFrontLeft,
+                                  isDark: true,
+                                ),
+                                _InfoCard(
+                                  title: 'FrontRight Distance',
+                                  value: ultrasonicFrontRight,
+                                  isDark: true,
+                                ),
+                                _InfoCard(
+                                  title: 'BackRight Distance',
+                                  value: ultrasonicBackRight,
+                                  isDark: true,
+                                ),
+                              ],
                             );
-                          });
-                        }
+                          },
+                        ),
+                        Positioned(
+                          bottom: 10,
+                          right: 10,
+                          child: FloatingActionButton(
+                            onPressed: () {
+                              final tempController = TextEditingController();
+                              final humidityController =
+                                  TextEditingController();
 
-                        final dhtHumidity =
-                            data['dht']?['humidity']?.toString() ?? 'N/A';
-                        final dhtTemperature =
-                            data['dht']?['temperature']?.toString() ?? 'N/A';
-                        final flameStatus =
-                            data['flame']?['status']?.toString() ?? 'N/A';
-                        final mq135Status =
-                            data['mq135']?['rawValue']?.toString() ?? 'N/A';
-                        final vibrationCount =
-                            data['vibration']?['count']?.toString() ?? 'N/A';
-                        final ultrasonicBackLeft =
-                            data['ultrasonic']?['backLeft']?['status']
-                                ?.toString() ??
-                            'N/A';
-                        final ultrasonicFrontLeft =
-                            data['ultrasonic']?['frontLeft']?['status']
-                                ?.toString() ??
-                            'N/A';
-                        final ultrasonicFrontRight =
-                            data['ultrasonic']?['frontRight']?['status']
-                                ?.toString() ??
-                            'N/A';
-                        final ultrasonicBackRight =
-                            data['ultrasonic']?['backRight']?['status']
-                                ?.toString() ??
-                            'N/A';
-
-                        return Wrap(
-                          spacing: 16,
-                          runSpacing: 16,
-                          children: [
-                            _InfoCard(
-                              title: 'Alcohol Percentage',
-                              value: '$alcoholPercentage%',
-                              isDark: true,
-                              isWarning: isAlcoholHigh,
-                            ),
-                            _InfoCard(
-                              title: 'Humidity',
-                              value: '$dhtHumidity%',
-                              isDark: true,
-                            ),
-                            _InfoCard(
-                              title: 'Temperature',
-                              value: '$dhtTemperature°C',
-                              isDark: true,
-                            ),
-                            _InfoCard(
-                              title: 'Fire Status',
-                              value: flameStatus,
-                              isDark: true,
-                            ),
-                            _InfoCard(
-                              title: 'Smoke Status',
-                              value: mq135Status,
-                              isDark: true,
-                            ),
-                            _InfoCard(
-                              title: 'Vibration',
-                              value: vibrationCount,
-                              isDark: true,
-                            ),
-                            _InfoCard(
-                              title: 'BackLeft Distance',
-                              value: ultrasonicBackLeft,
-                              isDark: true,
-                            ),
-                            _InfoCard(
-                              title: 'Frontleft Distance',
-                              value: ultrasonicFrontLeft,
-                              isDark: true,
-                            ),
-                            _InfoCard(
-                              title: 'FrontRight Distance',
-                              value: ultrasonicFrontRight,
-                              isDark: true,
-                            ),
-                            _InfoCard(
-                              title: 'FrontLeft Distance',
-                              value: ultrasonicBackRight,
-                              isDark: true,
-                            ),
-                          ],
-                        );
-                      },
+                              showDialog(
+                                context: context,
+                                builder:
+                                    (context) => AlertDialog(
+                                      title: const Text('Set Thresholds'),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          TextField(
+                                            controller: tempController,
+                                            decoration: const InputDecoration(
+                                              labelText:
+                                                  'Temperature Threshold (°C)',
+                                            ),
+                                            keyboardType: TextInputType.number,
+                                          ),
+                                          TextField(
+                                            controller: humidityController,
+                                            decoration: const InputDecoration(
+                                              labelText:
+                                                  'Humidity Threshold (%)',
+                                            ),
+                                            keyboardType: TextInputType.number,
+                                          ),
+                                        ],
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              tempThreshold = double.tryParse(
+                                                tempController.text,
+                                              );
+                                              humidityThreshold =
+                                                  double.tryParse(
+                                                    humidityController.text,
+                                                  );
+                                            });
+                                            Navigator.pop(context);
+                                          },
+                                          child: const Text('Save'),
+                                        ),
+                                      ],
+                                    ),
+                              );
+                            },
+                            child: const Icon(Icons.settings),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -326,13 +470,13 @@ class _InfoCard extends StatelessWidget {
   final String title;
   final String value;
   final bool isDark;
-  final bool isWarning; // << Added
+  final bool isWarning;
 
   const _InfoCard({
     required this.title,
     required this.value,
     this.isDark = false,
-    this.isWarning = false, // << Added
+    this.isWarning = false,
   });
 
   @override
@@ -362,9 +506,7 @@ class _InfoCard extends StatelessWidget {
               color:
                   isWarning
                       ? Colors.redAccent
-                      : isDark
-                      ? Colors.white
-                      : Colors.black,
+                      : (isDark ? Colors.white : Colors.black),
             ),
           ),
         ],

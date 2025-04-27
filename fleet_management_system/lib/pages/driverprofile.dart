@@ -268,8 +268,67 @@ class _DriverProfileState extends State<DriverProfile> {
 
                             final flameStatus =
                                 data['flame']?['status']?.toString() ?? 'N/A';
+
+                            final isFlameDetected =
+                                flameStatus.toLowerCase() == 'flame detected';
+
+                            if (isFlameDetected) {
+                              Future.microtask(() {
+                                showDialog(
+                                  context: context,
+                                  builder:
+                                      (context) => AlertDialog(
+                                        title: const Text('Fire Warning!'),
+                                        content: const Text(
+                                          'Flame detected! Immediate action required!',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed:
+                                                () => Navigator.pop(context),
+                                            child: const Text('OK'),
+                                          ),
+                                        ],
+                                      ),
+                                );
+                              });
+                            }
+
+                            // MQ135 Smoke Status
+                            final mq135RawValue = data['mq135']?['rawValue'];
                             final mq135Status =
-                                data['mq135']?['rawValue']?.toString() ?? 'N/A';
+                                mq135RawValue?.toString() ?? 'N/A';
+
+                            final double? smokeValue = double.tryParse(
+                              mq135Status,
+                            );
+                            final bool isSmokeWarning =
+                                smokeValue != null &&
+                                smokeValue > 300; // Adjust threshold
+
+                            // Show alert when smoke level is high
+                            if (isSmokeWarning) {
+                              Future.microtask(() {
+                                showDialog(
+                                  context: context,
+                                  builder:
+                                      (context) => AlertDialog(
+                                        title: const Text('Smoke Warning!'),
+                                        content: Text(
+                                          'High smoke levels detected! ($mq135Status)',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed:
+                                                () => Navigator.pop(context),
+                                            child: const Text('OK'),
+                                          ),
+                                        ],
+                                      ),
+                                );
+                              });
+                            }
+
                             final vibrationCount =
                                 data['vibration']?['count']?.toString() ??
                                 'N/A';
@@ -321,7 +380,9 @@ class _DriverProfileState extends State<DriverProfile> {
                                   title: 'Smoke Status',
                                   value: mq135Status,
                                   isDark: true,
+                                  isWarning: isSmokeWarning,
                                 ),
+
                                 _InfoCard(
                                   title: 'Vibration',
                                   value: vibrationCount,

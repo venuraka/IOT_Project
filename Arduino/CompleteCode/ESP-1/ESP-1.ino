@@ -5,8 +5,8 @@
 #include "DHT.h"
 
 // WiFi Credentials
-#define WIFI_SSID "Dialog 4G 437"
-#define WIFI_PASSWORD "D3c000D3"
+#define WIFI_SSID "Fiber SLT"
+#define WIFI_PASSWORD "#Ranasinghe903"
 
 // Firebase Credentials
 #define API_KEY "AIzaSyD5lrh1dowrXxvuNs16PZ8tKmRBIcsFdvg"
@@ -14,7 +14,6 @@
 
 // Sensor Pins
 #define FLAME_SENSOR_DIGITAL 4    
-#define FLAME_SENSOR_ANALOG 34     
 #define DHTPIN 27  
 #define DHTTYPE DHT11
 #define MQ3_PIN 35   
@@ -66,7 +65,6 @@ void setup() {
   Serial.begin(115200);
 
   pinMode(FLAME_SENSOR_DIGITAL, INPUT);
-  pinMode(FLAME_SENSOR_ANALOG, INPUT);
   pinMode(MQ3_PIN, INPUT);
   
   dht.begin();
@@ -107,11 +105,11 @@ void setup() {
 void loop() {
   if (!Firebase.ready()) return;
 
-  // === FLAME SENSOR ===
-  int analogFlameValue = analogRead(FLAME_SENSOR_ANALOG);
-  String flameStatus = (analogFlameValue < 200) ? "Flame Detected!" : "No Flame Detected.";
-  Serial.println("Flame Status: " + flameStatus);
-  Firebase.RTDB.setString(&fbdo, "/sensors/flame/status", flameStatus);
+   // === FLAME SENSOR ===
+  int digitalFlameValue = digitalRead(FLAME_SENSOR_DIGITAL);
+    String flameStatus = (digitalFlameValue == LOW) ? "Flame Detected!" : "No Flame Detected.";
+      Serial.println("Flame Status: " + flameStatus);
+      Firebase.RTDB.setString(&fbdo, "/sensors/flame/status", flameStatus);
 
   // === DHT11 SENSOR ===
   float humidity = dht.readHumidity();

@@ -4,8 +4,8 @@
 #include "addons/RTDBHelper.h"
 
 // ===== WiFi Credentials =====
-#define WIFI_SSID "Home"
-#define WIFI_PASSWORD "Ravindu@6205"
+#define WIFI_SSID "##"
+#define WIFI_PASSWORD "##"
 
 // ===== Firebase Credentials =====
 #define API_KEY "AIzaSyD5lrh1dowrXxvuNs16PZ8tKmRBIcsFdvg"

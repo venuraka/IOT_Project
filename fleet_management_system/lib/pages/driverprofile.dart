@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class DriverProfile extends StatefulWidget {
   final Map<String, String> driverData;
 
-  const DriverProfile({required this.driverData});
+  const DriverProfile({Key? key, required this.driverData})
+    : super(key: key); // Added Key? key
 
   @override
   State<DriverProfile> createState() => _DriverProfileState();
@@ -16,10 +19,97 @@ class _DriverProfileState extends State<DriverProfile> {
   bool tempAlertShown = false;
   bool humidityAlertShown = false;
 
+  Completer<GoogleMapController> _controller = Completer();
+  Set<Marker> _markers = {}; // Set to hold markers
+
+  final DatabaseReference databaseRef = FirebaseDatabase.instance.ref('gps');
+
+  StreamSubscription? _gpsLocationSubscription;
+
   @override
   void initState() {
-    print('Driver Data: ${widget.driverData}');
     super.initState();
+    print('Driver Data: ${widget.driverData}');
+    _listenToGpsLocation();
+  }
+
+  @override
+  void dispose() {
+    _gpsLocationSubscription?.cancel();
+    super.dispose();
+  }
+
+  // Modify the _listenToGpsLocation() method for better map updates
+
+  void _listenToGpsLocation() {
+    _gpsLocationSubscription = databaseRef.onValue.listen(
+      (event) {
+        final dataSnapshot = event.snapshot;
+
+        if (dataSnapshot.value != null) {
+          print('GPS Data received: ${dataSnapshot.value}'); // Debug print
+
+          Map<dynamic, dynamic>? locationData =
+              dataSnapshot.value as Map<dynamic, dynamic>?;
+
+          if (locationData != null) {
+            double? latitude = double.tryParse(
+              locationData['latitude'].toString(),
+            );
+            double? longitude = double.tryParse(
+              locationData['longitude'].toString(),
+            );
+
+            print(
+              'Parsed location: Lat: $latitude, Lng: $longitude',
+            ); // Debug print
+
+            if (latitude != null && longitude != null) {
+              // Create a new marker
+              final updatedMarkers = <Marker>{
+                Marker(
+                  markerId: const MarkerId('current_gps_location'),
+                  position: LatLng(latitude, longitude),
+                  infoWindow: InfoWindow(
+                    title: 'Current Vehicle Location',
+                    snippet: 'Lat: $latitude, Lng: $longitude',
+                  ),
+                  icon: BitmapDescriptor.defaultMarker,
+                ),
+              };
+
+              // Update the state
+              setState(() {
+                _markers = updatedMarkers;
+              });
+
+              // Move camera to the location - with better error handling
+              _controller.future
+                  .then((controller) {
+                    controller.animateCamera(
+                      CameraUpdate.newLatLngZoom(
+                        LatLng(latitude, longitude),
+                        15.0, // Higher zoom level for better visibility
+                      ),
+                    );
+                  })
+                  .catchError((error) {
+                    print('Error moving camera: $error');
+                  });
+            }
+          }
+        } else {
+          print('No GPS location data available');
+        }
+      },
+      onError: (error) {
+        print('Error fetching GPS location: $error');
+      },
+    );
+  }
+
+  void _onMapCreated(GoogleMapController controller) {
+    _controller.complete(controller);
   }
 
   @override
@@ -33,7 +123,7 @@ class _DriverProfileState extends State<DriverProfile> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          "Driver Details",
+          "Driver Details", // Keep this title if this screen is primarily for driver details
           style: TextStyle(color: Colors.white),
         ),
       ),
@@ -42,7 +132,7 @@ class _DriverProfileState extends State<DriverProfile> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Profile Info Section
+            // Profile Info Section (Keep this if you still want to show driver info)
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -117,6 +207,7 @@ class _DriverProfileState extends State<DriverProfile> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Sensor Data Section (Keep this if needed)
                 Expanded(
                   flex: 1,
                   child: Container(
@@ -204,13 +295,15 @@ class _DriverProfileState extends State<DriverProfile> {
                                 tempThreshold != null &&
                                 tempVal != null &&
                                 (tempVal > tempThreshold! ||
-                                    tempVal < tempThreshold! - 5);
+                                    tempVal <
+                                        tempThreshold! - 5); // Check range
 
                             final isHumidityWarning =
                                 humidityThreshold != null &&
                                 humidityVal != null &&
                                 (humidityVal > humidityThreshold! ||
-                                    humidityVal < humidityThreshold! - 5);
+                                    humidityVal <
+                                        humidityThreshold! - 5); // Check range
 
                             // Temperature Alert
                             if (isTempWarning && !tempAlertShown) {
@@ -475,16 +568,27 @@ class _DriverProfileState extends State<DriverProfile> {
                   ),
                 ),
                 const SizedBox(width: 20),
+                // Map Section
                 Expanded(
                   child: Container(
                     height: 470,
                     decoration: BoxDecoration(
+                      // Keep decoration for border radius
                       borderRadius: BorderRadius.circular(12),
-                      image: const DecorationImage(
-                        image: AssetImage('images/login2.png'),
-                        fit: BoxFit.cover,
-                      ),
                     ),
+                    // --- GoogleMap Widget ---
+                    child: GoogleMap(
+                      mapType: MapType.normal,
+                      initialCameraPosition: const CameraPosition(
+                        target: LatLng(6.9271, 79.8612),
+                        zoom: 10, // More reasonable initial zoom
+                      ),
+                      onMapCreated: _onMapCreated,
+                      markers: _markers,
+                      myLocationButtonEnabled: false,
+                      myLocationEnabled: false,
+                    ),
+                    // --- End GoogleMap Widget ---
                   ),
                 ),
               ],
@@ -496,6 +600,7 @@ class _DriverProfileState extends State<DriverProfile> {
   }
 }
 
+// Keep the _ProfileInfo and _InfoCard widgets as they are
 class _ProfileInfo extends StatelessWidget {
   final String title;
   final String value;

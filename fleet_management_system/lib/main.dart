@@ -19,8 +19,8 @@ class MyApp extends StatelessWidget {
       title: 'Firebase Login Demo',
       initialRoute: '/',
       routes: {
-        '/': (context) => LoginPage(),
-        '/dashboard': (context) => DashboardPage(),
+        '/': (context) => DashboardPage(),
+
         // '/driver': (context) => DriverProfile(),
       },
     );

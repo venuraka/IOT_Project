@@ -6,8 +6,8 @@
 #include "addons/RTDBHelper.h"
 
 // ===== Wi-Fi Credentials =====
-#define WIFI_SSID "Home"
-#define WIFI_PASSWORD "Ravindu@6205"
+#define WIFI_SSID "##"
+#define WIFI_PASSWORD "###"
 // Alternative Wi-Fi (uncomment to use Dialog)
 // #define WIFI_SSID "Dialog 4G 437"
 // #define WIFI_PASSWORD "D3c000D3"

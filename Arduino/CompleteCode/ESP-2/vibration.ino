@@ -4,8 +4,8 @@
 #include "addons/RTDBHelper.h"
 
 // ===== Wi-Fi Credentials =====
-#define WIFI_SSID "Dialog 4G 437"
-#define WIFI_PASSWORD "D3c000D3"
+#define WIFI_SSID "..."
+#define WIFI_PASSWORD "..."
 
 // ===== Firebase Credentials =====
 #define API_KEY "AIzaSyD5lrh1dowrXxvuNs16PZ8tKmRBIcsFdvg"
@@ -18,9 +18,10 @@ FirebaseConfig config;
 
 // ===== Vibration Sensor Setup =====
 #define VIBRATION_PIN 33
+#define VIBRATION_THRESHOLD 4000  // Adjust as needed
+
 int vibrationCount = 0;
-int vibrationValue = 0;
-bool lastState = LOW;
+bool vibrationActive = false;
 
 void setup() {
   Serial.begin(115200);
@@ -50,39 +51,38 @@ void setup() {
   } else {
     Serial.println("❌ Firebase init failed: " + fbdo.errorReason());
   }
+
+  Serial.println("🔧 801S Vibration Sensor Test Started");
 }
 
 void loop() {
   if (!Firebase.ready()) return;
 
-  bool vibrationState = digitalRead(VIBRATION_PIN);
+  int sensorValue = analogRead(VIBRATION_PIN);
 
-  // Detect rising edge
-  if (vibrationState == HIGH && lastState == LOW) {
-    vibrationCount++;
-    vibrationValue += 100;  // Increase fake "vibration strength"
-    Serial.println("💥 Vibration Detected!");
-  }
-
-  lastState = vibrationState;
-
-  // Decay the vibration value over time (to simulate intensity fading)
-  if (vibrationValue > 0) {
-    vibrationValue -= 10; // Reduce gradually
+  // Detect vibration
+  if (sensorValue > VIBRATION_THRESHOLD) {
+    if (!vibrationActive) {
+      vibrationActive = true;
+      vibrationCount++;
+      Serial.println("💥 Vibration Detected!");
+    }
+  } else {
+    vibrationActive = false;
   }
 
   // Upload to Firebase
+  Firebase.RTDB.setInt(&fbdo, "/sensors/vibration/value", sensorValue);
+  Firebase.RTDB.setString(&fbdo, "/sensors/vibration/status", (vibrationActive ? "VIBRATION" : "STABLE"));
   Firebase.RTDB.setInt(&fbdo, "/sensors/vibration/count", vibrationCount);
-  Firebase.RTDB.setString(&fbdo, "/sensors/vibration/status", (vibrationState == HIGH ? "Vibration Detected" : "No Vibration"));
-  Firebase.RTDB.setInt(&fbdo, "/sensors/vibration/value", vibrationValue);
 
-  // Serial monitor logs
-  Serial.print("Vibration State: ");
-  Serial.println(vibrationState);
-  Serial.print("Vibration Count: ");
+  // Serial Monitor Output
+  Serial.print("Analog Value: ");
+  Serial.print(sensorValue);
+  Serial.print(" | Status: ");
+  Serial.print(vibrationActive ? "VIBRATION" : "STABLE");
+  Serial.print(" | Count: ");
   Serial.println(vibrationCount);
-  Serial.print("Vibration Value (simulated): ");
-  Serial.println(vibrationValue);
 
-  delay(500);
+  delay(500);  // adjust for smoother performance
 }

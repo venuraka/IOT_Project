@@ -3,22 +3,22 @@
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
 
-// ===== Wi-Fi Credentials =====
-#define WIFI_SSID "Dialog 4G 437"
-#define WIFI_PASSWORD "D3c000D3"
+// ====== Wi-Fi Credentials ======
+#define WIFI_SSID "###"
+#define WIFI_PASSWORD "#####"
 
-// ===== Firebase Credentials =====
+// ====== Firebase Credentials ======
 #define API_KEY "AIzaSyD5lrh1dowrXxvuNs16PZ8tKmRBIcsFdvg"
 #define DATABASE_URL "https://fleetz-74a25-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
-// ===== Firebase Objects =====
+// ====== Firebase Objects ======
 FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
 
-// ===== MQ135 Sensor =====
+// ====== MQ-135 Smoke Sensor Setup ======
 #define MQ135_PIN 32
-#define SMOKE_THRESHOLD 2000
+#define SMOKE_THRESHOLD 1500  // Adjust based on testing
 
 void setup() {
   Serial.begin(115200);
@@ -49,33 +49,24 @@ void setup() {
     Serial.println("❌ Firebase init failed: " + fbdo.errorReason());
   }
 
-  // MQ135 Warm-up (optional)
-  Serial.println("🔥 MQ135 Warming up...");
-  delay(30000);
+  Serial.println("🔧 MQ-135 Smoke Sensor Test Started");
 }
 
 void loop() {
   if (!Firebase.ready()) return;
 
   int smokeLevel = analogRead(MQ135_PIN);
+  String smokeStatus = smokeLevel > SMOKE_THRESHOLD ? "SMOKE DETECTED" : "NORMAL";
 
-  Serial.print("🔥 Smoke Level: ");
-  Serial.println(smokeLevel);
+  // Upload to Firebase
+  Firebase.RTDB.setInt(&fbdo, "/sensors/smoke/value", smokeLevel);
+  Firebase.RTDB.setString(&fbdo, "/sensors/smoke/status", smokeStatus);
 
-  // Upload raw value to Firebase
-  if (Firebase.RTDB.setInt(&fbdo, "/sensors/mq135/rawValue", smokeLevel)) {
-    Serial.println("✅ Uploaded: rawValue");
-  } else {
-    Serial.println("❌ Error: " + fbdo.errorReason());
-  }
+  // Debug Output
+  Serial.print("Smoke Level: ");
+  Serial.print(smokeLevel);
+  Serial.print(" | Status: ");
+  Serial.println(smokeStatus);
 
-  // Upload air quality status
-  String status = (smokeLevel > SMOKE_THRESHOLD) ? "High Smoke Detected" : "Normal";
-  if (Firebase.RTDB.setString(&fbdo, "/sensors/mq135/status", status)) {
-    Serial.println("✅ Uploaded: status = " + status);
-  } else {
-    Serial.println("❌ Error: " + fbdo.errorReason());
-  }
-
-  delay(2000);  // 2 sec delay between readings
+  delay(1000);  // Read every second
 }

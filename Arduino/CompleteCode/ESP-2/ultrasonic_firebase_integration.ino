@@ -4,8 +4,8 @@
 #include "addons/RTDBHelper.h"
 
 // ===== WiFi Credentials =====
-#define WIFI_SSID "Dialog 4G 437"
-#define WIFI_PASSWORD "D3c000D3"
+#define WIFI_SSID "Home"
+#define WIFI_PASSWORD "Ravindu@6205"
 
 // ===== Firebase Credentials =====
 #define API_KEY "AIzaSyD5lrh1dowrXxvuNs16PZ8tKmRBIcsFdvg"
@@ -17,8 +17,8 @@ FirebaseAuth auth;
 FirebaseConfig config;
 
 // ===== Ultrasonic Sensor Configuration =====
-const int trigPins[2] = {12, 23};   // Example: frontLeft = 12/14, frontRight = 23/21
-const int echoPins[2] = {14, 21};
+const int trigPins[2] = {12, 23};   // frontLeft = 12, frontRight = 23
+const int echoPins[2] = {14, 21};   // frontLeft = 14, frontRight = 21
 const char* sensorKeys[2] = {"frontLeft", "frontRight"};
 
 const int numSensors = 2;
@@ -28,13 +28,13 @@ float distances[2];
 void setup() {
   Serial.begin(115200);
 
-  // Initialize pins
+  // Initialize ultrasonic pins
   for (int i = 0; i < numSensors; i++) {
     pinMode(trigPins[i], OUTPUT);
     pinMode(echoPins[i], INPUT);
   }
 
-  // Connect to WiFi
+  // Connect to Wi-Fi
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.print("Connecting to WiFi");
   while (WiFi.status() != WL_CONNECTED) {
@@ -43,7 +43,7 @@ void setup() {
   }
   Serial.println("\n✅ Connected to WiFi");
 
-  // Setup Firebase
+  // Initialize Firebase
   config.api_key = API_KEY;
   config.database_url = DATABASE_URL;
   auth.user.email = "testuser@gmail.com";
@@ -72,13 +72,13 @@ float measureDistance(int trigPin, int echoPin) {
     delayMicroseconds(10);
     digitalWrite(trigPin, LOW);
 
-    long duration = pulseIn(echoPin, HIGH, 30000);  // 30ms timeout
+    long duration = pulseIn(echoPin, HIGH, 30000);  // Timeout: 30 ms
     if (duration > 0) {
-      float distance = duration * 0.0343 / 2.0;  // Convert to cm
+      float distance = (duration * 0.0343) / 2.0;
       total += distance;
       valid++;
     }
-    delay(10);
+    delay(10); // Small delay between samples
   }
 
   return (valid > 0) ? total / valid : -1.0;
@@ -96,7 +96,6 @@ void loop() {
       Serial.print(distances[i], 2);
       Serial.println(" cm");
 
-      // Firebase path: /sensors/ultrasonic/frontLeft/status
       String path = "/sensors/ultrasonic/" + String(sensorKeys[i]) + "/status";
       if (Firebase.RTDB.setFloat(&fbdo, path, distances[i])) {
         Serial.println("✅ Sent to Firebase: " + path + " = " + String(distances[i]));
@@ -109,5 +108,5 @@ void loop() {
   }
 
   Serial.println("-----------------------------");
-  delay(500);  // Read interval
+  delay(500);
 }

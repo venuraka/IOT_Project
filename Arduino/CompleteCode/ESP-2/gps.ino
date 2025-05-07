@@ -1,41 +1,45 @@
 #include <WiFi.h>
 #include <Firebase_ESP_Client.h>
-#include <TinyGPS++.h>
-#include <HardwareSerial.h>
+#include <TinyGPSPlus.h>
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
 
-// ===== Wi-Fi Credentials =====
+// === Wi-Fi Credentials ===
 #define WIFI_SSID "##"
-#define WIFI_PASSWORD "$#"
+#define WIFI_PASSWORD "####"
 
-// ===== Firebase Credentials =====
+// === Firebase Credentials ===
 #define API_KEY "AIzaSyD5lrh1dowrXxvuNs16PZ8tKmRBIcsFdvg"
 #define DATABASE_URL "https://fleetz-74a25-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
-// ===== Firebase Setup =====
+// === Firebase Objects ===
 FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
 
-// ===== GPS Setup =====
+// === GPS Setup ===
 TinyGPSPlus gps;
-HardwareSerial mySerial(2);  // Using UART2 (GPIO18 = RX, GPIO19 = TX)
+HardwareSerial GPSserial(2);
+#define GPS_RX_PIN 19  // GPS TX → ESP32 RX
+#define GPS_TX_PIN 18  // Not used for NEO-6M
 
 void setup() {
   Serial.begin(115200);
-  mySerial.begin(9600, SERIAL_8N1, 18, 19);  // GPS RX and TX
 
-  // Connect to Wi-Fi
+  // Start GPS serial
+  GPSserial.begin(9600, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
+  Serial.println("🔄 Initializing GPS...");
+
+  // Connect Wi-Fi
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  Serial.print("📶 Connecting to Wi-Fi");
+  Serial.print("🌐 Connecting to Wi-Fi");
   while (WiFi.status() != WL_CONNECTED) {
     Serial.print(".");
     delay(500);
   }
   Serial.println("\n✅ Wi-Fi Connected");
 
-  // Configure Firebase
+  // Setup Firebase
   config.api_key = API_KEY;
   config.database_url = DATABASE_URL;
   auth.user.email = "testuser@gmail.com";
@@ -45,36 +49,39 @@ void setup() {
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
 
-  while (!Firebase.ready()) {
-    Serial.println("⏳ Waiting for Firebase...");
-    delay(1000);
+  if (Firebase.ready()) {
+    Serial.println("✅ Firebase is ready");
+  } else {
+    Serial.println("❌ Firebase init failed: " + fbdo.errorReason());
   }
-  Serial.println("✅ Firebase is ready");
+
+  Serial.println("📡 GPS tracking started...");
 }
 
 void loop() {
-  // Read and parse GPS data
-  while (mySerial.available() > 0) {
-    gps.encode(mySerial.read());
+  // Process GPS data
+  while (GPSserial.available() > 0) {
+    gps.encode(GPSserial.read());
   }
 
-  // Check if location is valid and updated
-  if (gps.location.isUpdated() && gps.location.isValid()) {
+  // If GPS location is valid, send to Firebase
+  if (gps.location.isUpdated()) {
     double lat = gps.location.lat();
     double lng = gps.location.lng();
 
-    Serial.print("📍 Latitude: ");
-    Serial.print(lat, 6);
-    Serial.print(" | Longitude: ");
+    Serial.print("Latitude: ");
+    Serial.println(lat, 6);
+    Serial.print("Longitude: ");
     Serial.println(lng, 6);
 
-    // Firebase base path
-    String basePath = "/sensors/gps";
-
-    // Send to Firebase
-    Firebase.RTDB.setDouble(&fbdo, basePath + "/latitude", lat);
-    Firebase.RTDB.setDouble(&fbdo, basePath + "/longitude", lng);
-
-    delay(3000);  // Update every 3 seconds
+    if (Firebase.ready()) {
+      // Upload latitude & longitude
+      Firebase.RTDB.setDouble(&fbdo, "/gps/latitude", lat);
+      Firebase.RTDB.setDouble(&fbdo, "/gps/longitude", lng);
+    } else {
+      Serial.println("⚠️ Firebase not ready");
+    }
   }
+
+  delay(1000);  // Update every 1 second
 }

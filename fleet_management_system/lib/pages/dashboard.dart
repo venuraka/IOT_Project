@@ -127,7 +127,7 @@ class _DashboardState extends State<Dashboard> {
 
   void startSpeedUpdates() {
     speedTimer?.cancel();
-    speedTimer = Timer.periodic(Duration(milliseconds: 50), (timer) {
+    speedTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
       if (isConnected) {
         sendOBDCommand("010D"); // Speed PID
       } else {

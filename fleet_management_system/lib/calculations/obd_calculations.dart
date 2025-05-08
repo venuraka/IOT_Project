@@ -19,18 +19,27 @@ double calculateAcceleration(
 }
 
 double calculateDeceleration(
-  double? previousSpeed,
-  double currentSpeed,
-  DateTime? previousTime,
-  DateTime currentTime,
-) {
-  double acceleration = calculateAcceleration(
-    previousSpeed,
-    currentSpeed,
-    previousTime,
-    currentTime,
-  );
-  return acceleration < 0
-      ? acceleration.abs()
-      : 0.0; // Only return positive deceleration values
+    double? previousSpeed,
+    double currentSpeed,
+    DateTime? previousTime,
+    DateTime currentTime,
+    ) {
+  if (previousSpeed == null || previousTime == null) {
+    return 0.0;
+  }
+
+  // Direct calculation for deceleration instead of reusing acceleration function
+  double speedDifference = previousSpeed - currentSpeed;
+
+  // If speed is decreasing (positive difference)
+  if (speedDifference > 0) {
+    double deltaT = currentTime.difference(previousTime).inMilliseconds / 1000.0;
+
+    // Avoid division by extremely small time differences
+    if (deltaT < 0.05) deltaT = 0.05;
+
+    return speedDifference / deltaT;
+  }
+
+  return 0.0; // No deceleration
 }

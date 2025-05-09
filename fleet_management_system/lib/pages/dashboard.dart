@@ -8,8 +8,6 @@ import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:fleet_management_system/calculations/obd_calculations.dart';
 
-import 'package:firebase_database/firebase_database.dart';
-
 import 'login.dart';
 
 class Dashboard extends StatefulWidget {
@@ -20,6 +18,7 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<Dashboard> {
+
   BluetoothConnection? connection;
   bool isConnecting = true;
   bool isConnected = false;
@@ -56,11 +55,11 @@ class _DashboardState extends State<Dashboard> {
     });
 
     Map<Permission, PermissionStatus> statuses =
-        await [
-          Permission.bluetoothConnect,
-          Permission.bluetoothScan,
-          Permission.locationWhenInUse,
-        ].request();
+    await [
+      Permission.bluetoothConnect,
+      Permission.bluetoothScan,
+      Permission.locationWhenInUse,
+    ].request();
 
     if (statuses[Permission.bluetoothConnect] != PermissionStatus.granted ||
         statuses[Permission.bluetoothScan] != PermissionStatus.granted ||
@@ -74,10 +73,10 @@ class _DashboardState extends State<Dashboard> {
 
     try {
       List<BluetoothDevice> devices =
-          await FlutterBluetoothSerial.instance.getBondedDevices();
+      await FlutterBluetoothSerial.instance.getBondedDevices();
 
       BluetoothDevice? device = devices.firstWhere(
-        (d) => d.address == obdDeviceAddress,
+            (d) => d.address == obdDeviceAddress,
         orElse: () => BluetoothDevice(address: "", name: ""),
       );
 
@@ -92,26 +91,26 @@ class _DashboardState extends State<Dashboard> {
 
       BluetoothConnection.toAddress(device.address)
           .then((_connection) {
-            setState(() {
-              connection = _connection;
-              isConnected = true;
-              isConnecting = false;
-            });
-            showTemporaryAlert("Connected to OBD device Successfully");
+        setState(() {
+          connection = _connection;
+          isConnected = true;
+          isConnecting = false;
+        });
+        showTemporaryAlert("Connected to OBD device Successfully");
 
-            print("Connected to OBD-II");
-            startListening();
-            startRPMUpdates();
-            startSpeedUpdates();
-          })
+        print("Connected to OBD-II");
+        startListening();
+        startRPMUpdates();
+        startSpeedUpdates();
+      })
           .catchError((error) {
-            setState(() {
-              responseText = "Connection failed!";
-              isConnecting = false;
-              isConnected = false;
-            });
-            print("Connection error: $error");
-          });
+        setState(() {
+          responseText = "Connection failed!";
+          isConnecting = false;
+          isConnected = false;
+        });
+        print("Connection error: $error");
+      });
     } catch (e) {
       setState(() {
         responseText = "Error: $e";
@@ -134,7 +133,7 @@ class _DashboardState extends State<Dashboard> {
 
   void startSpeedUpdates() {
     speedTimer?.cancel();
-    speedTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
+    speedTimer = Timer.periodic(Duration(milliseconds: 50), (timer) {
       if (isConnected) {
         sendOBDCommand("010D"); // Speed PID
       } else {
@@ -181,7 +180,7 @@ class _DashboardState extends State<Dashboard> {
       int rpmValue =
           ((int.parse(hexValues[2], radix: 16) * 256) +
               int.parse(hexValues[3], radix: 16)) ~/
-          4;
+              4;
 
       setState(() {
         engineRPM = "$rpmValue RPM";
@@ -221,8 +220,7 @@ class _DashboardState extends State<Dashboard> {
 
       // If instant deceleration detected, override calculated value
       if (instantDeceleration) {
-        decelerationValue =
-            (previousSpeed! - speedValue) /
+        decelerationValue = (previousSpeed! - speedValue) /
             currentTime.difference(previousTime!).inSeconds.clamp(1, 1000);
       }
 
@@ -237,7 +235,6 @@ class _DashboardState extends State<Dashboard> {
       print("Error parsing speed: $e");
     }
   }
-
   void showTemporaryAlert(String message) {
     setState(() {
       temporaryAlertMessage = message;
@@ -256,10 +253,8 @@ class _DashboardState extends State<Dashboard> {
       return "Disconnected";
     }
 
-    double accValue =
-        double.tryParse(acceleration.replaceAll(" m/s²", "")) ?? 0;
-    double decValue =
-        double.tryParse(deceleration.replaceAll(" m/s²", "")) ?? 0;
+    double accValue = double.tryParse(acceleration.replaceAll(" m/s²", "")) ?? 0;
+    double decValue = double.tryParse(deceleration.replaceAll(" m/s²", "")) ?? 0;
 
     if (accValue > 2.5) {
       return "Accelerating: ${accValue.toStringAsFixed(2)} m/s²";
@@ -276,7 +271,6 @@ class _DashboardState extends State<Dashboard> {
     if (value == "Disconnected") return Colors.grey;
     return const Color.fromARGB(255, 15, 92, 239); // Default blue
   }
-
   @override
   void dispose() {
     rpmTimer?.cancel();
@@ -285,6 +279,7 @@ class _DashboardState extends State<Dashboard> {
     connection?.dispose();
     super.dispose();
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -320,34 +315,29 @@ class _DashboardState extends State<Dashboard> {
                       }
                     },
                     itemBuilder:
-                        (context) => [
-                          const PopupMenuItem(
-                            value: 'logout',
-                            child: Text('Logout'),
-                          ),
-                        ],
+                        (context) =>
+                    [
+                      const PopupMenuItem(
+                        value: 'logout',
+                        child: Text('Logout'),
+                      ),
+                    ],
                     child: const CircleAvatar(
                       radius: 18,
-                      backgroundImage: AssetImage('assets/images/profile.png'),
+                      backgroundImage: AssetImage("assets/images/profile.png"),
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 30),
-
-            StreamBuilder<DatabaseEvent>(
-              stream: null,
-              builder: (context, snapshot) {
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildInfoBox("Vibration", "70Hz"),
-                    _buildInfoBox("Temperature", "20 C"),
-                    _buildInfoBox("Humidity", "77%"),
-                  ],
-                );
-              }
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildInfoBox("Vibration", "70Hz"),
+                _buildInfoBox("Temperature", "20 C"),
+                _buildInfoBox("Humidity", "77%"),
+              ],
             ),
             const SizedBox(height: 15),
             Row(
@@ -357,27 +347,27 @@ class _DashboardState extends State<Dashboard> {
                 _buildInfoBox("RPM", "$engineRPM"),
               ],
             ),
-            const SizedBox(height: 15),
-            SizedBox(height: 15),
+          const SizedBox(height: 15),
+          SizedBox(height: 15),
             isConnected
                 ? _buildInfoBox(
-                  "Driver Status",
-                  _getDriverStatus(),
-                  width: 120,
-                  color: _getDriverStatusColor(_getDriverStatus()),
-                )
+              "Driver Status",
+              _getDriverStatus(),
+              width: 120,
+              color: _getDriverStatusColor(_getDriverStatus()),
+            )
                 : GestureDetector(
-                  onTap: () {
-                    print("Driver Status Tapped - Reconnecting...");
-                    connectToOBDII();
-                  },
-                  child: _buildInfoBox(
-                    "Driver Status",
-                    isConnecting ? "Reconnecting..." : "Disconnected",
-                    width: 160,
-                    color: Colors.grey,
-                  ),
-                ),
+              onTap: () {
+                print("Driver Status Tapped - Reconnecting...");
+                connectToOBDII();
+              },
+              child: _buildInfoBox(
+                "Driver Status",
+                isConnecting ? "Reconnecting..." : "Disconnected",
+                width: 160,
+                color: Colors.grey,
+              ),
+            ),
             const SizedBox(height: 20),
             const Text(
               "Alerts",
@@ -405,13 +395,10 @@ class _DashboardState extends State<Dashboard> {
                   // Positioned(top: 0, right: 80, child: _buildRadarArc()),
                   // Positioned(bottom: -20, left: 80, child: _buildRadarArc()),
                   // Positioned(bottom: -20, right: 80, child: _buildRadarArc()),
-                  Positioned(
-                    top: 0,
-                    left: 100,
-                    child: Transform.rotate(
-                      angle: 5.55,
-                      child: _buildRadarArc(),
-                    ),
+                  Positioned(top: 0, left: 100, child: Transform.rotate(
+                    angle: 5.55,
+                    child: _buildRadarArc(),
+                  ),
                   ),
                   Positioned(
                     top: 0,
@@ -437,12 +424,7 @@ class _DashboardState extends State<Dashboard> {
                       child: _buildRadarArc(),
                     ),
                   ),
-                  Center(
-                    child: Image.asset(
-                      "assets/images/car.png",
-                      fit: BoxFit.contain,
-                    ),
-                  ),
+                  Center(child: Image.asset("assets/images/car.png", fit: BoxFit.contain)),
                 ],
               ),
             ),
@@ -452,19 +434,22 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
+
   Widget _buildRadarArc() {
-    return CustomPaint(size: Size(60, 60), painter: RadarArcPainter());
+    return CustomPaint(
+      size: Size(60, 60),
+      painter: RadarArcPainter(),
+    );
   }
 }
 
 class RadarArcPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final Paint arcPaint =
-        Paint()
-          ..color = Colors.red.withOpacity(0.7)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3;
+    final Paint arcPaint = Paint()
+      ..color = Colors.red.withOpacity(0.7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
 
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
@@ -484,37 +469,32 @@ class RadarArcPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
-Widget _buildInfoBox(
-  String title,
-  String value, {
-  double width = 100,
-  Color? color,
-}) {
-  return Column(
-    children: [
-      Text(
-        title,
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-      ),
-      const SizedBox(height: 5),
-      Container(
-        width: width,
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: color ?? const Color.fromARGB(255, 15, 92, 239), // default
-          borderRadius: BorderRadius.circular(8),
+  Widget _buildInfoBox(String title, String value,
+      {double width = 100, Color? color}) {
+    return Column(
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
         ),
-        child: Text(
-          value,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+        const SizedBox(height: 5),
+        Container(
+          width: width,
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color ?? const Color.fromARGB(255, 15, 92, 239), // default
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            value,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-      ),
-    ],
-  );
-}
+      ],
+    );
+  }

@@ -24,7 +24,9 @@ class _DriverProfileState extends State<DriverProfile> {
   Completer<GoogleMapController> _controller = Completer();
   Set<Marker> _markers = {}; // Set to hold markers
 
-  final DatabaseReference databaseRef = FirebaseDatabase.instance.ref('gps');
+  final DatabaseReference databaseRef = FirebaseDatabase.instance.ref(
+    'sensors/gps',
+  );
 
   StreamSubscription? _gpsLocationSubscription;
 

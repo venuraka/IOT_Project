@@ -5,8 +5,8 @@
 #include "DHT.h"
 
 // WiFi Credentials
-#define WIFI_SSID "Fiber SLT"
-#define WIFI_PASSWORD "#Ranasinghe903"
+#define WIFI_SSID "Ravindu A70"
+#define WIFI_PASSWORD "Ravindu12345"
 
 // Firebase Credentials
 #define API_KEY "AIzaSyD5lrh1dowrXxvuNs16PZ8tKmRBIcsFdvg"
@@ -39,26 +39,17 @@ FirebaseConfig config;
 
 // Function to measure distance (in cm)
 float measureDistance(int trigPin, int echoPin) {
-  float total = 0;
-  int valid = 0;
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
 
-  for (int i = 0; i < numSamples; i++) {
-    digitalWrite(trigPin, LOW);
-    delayMicroseconds(2);
-    digitalWrite(trigPin, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(trigPin, LOW);
-
-    long duration = pulseIn(echoPin, HIGH, 30000);  // 30ms timeout
-    if (duration > 0) {
-      float distance = duration * 0.0343 / 2.0;
-      total += distance;
-      valid++;
-    }
-    delay(10);
+  long duration = pulseIn(echoPin, HIGH, 50000);
+  if (duration > 0 && duration < 30000) {
+    return duration * 0.0343 / 2.0;
   }
-
-  return (valid > 0) ? total / valid : -1.0;
+  return -1.0; // Out of range
 }
 
 void setup() {
@@ -66,7 +57,6 @@ void setup() {
 
   pinMode(FLAME_SENSOR_DIGITAL, INPUT);
   pinMode(MQ3_PIN, INPUT);
-  
   dht.begin();
   analogReadResolution(12);
 
@@ -77,72 +67,48 @@ void setup() {
 
   // Connect to Wi-Fi
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  Serial.print("Connecting to Wi-Fi");
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print(".");
-    delay(500);
-  }
-  Serial.println("\nConnected to Wi-Fi");
+  while (WiFi.status() != WL_CONNECTED) delay(500);
 
   // Firebase setup
   config.api_key = API_KEY;
   config.database_url = DATABASE_URL;
   auth.user.email = "testuser@gmail.com"; 
   auth.user.password = "test1234";
-  config.token_status_callback = tokenStatusCallback;
-
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
-
-  if (Firebase.ready()) {
-    Serial.println("Firebase is ready");
-  } else {
-    Serial.println("Firebase failed to initialize");
-    Serial.println(fbdo.errorReason());
-  }
 }
 
 void loop() {
   if (!Firebase.ready()) return;
 
-   // === FLAME SENSOR ===
-  int digitalFlameValue = digitalRead(FLAME_SENSOR_DIGITAL);
-    String flameStatus = (digitalFlameValue == LOW) ? "Flame Detected!" : "No Flame Detected.";
-      Serial.println("Flame Status: " + flameStatus);
-      Firebase.RTDB.setString(&fbdo, "/sensors/flame/status", flameStatus);
+  // Flame Sensor
+  String flameStatus = (digitalRead(FLAME_SENSOR_DIGITAL) == LOW) ? "Flame Detected!" : "No Flame Detected.";
+  Firebase.RTDB.setString(&fbdo, "/sensors/flame/status", flameStatus);
 
-  // === DHT11 SENSOR ===
+  // DHT Sensor
   float humidity = dht.readHumidity();
-  float temperature = dht.readTemperature(); 
+  float temperature = dht.readTemperature();
   if (!isnan(humidity) && !isnan(temperature)) {
-    Serial.printf("Humidity: %.2f %% | Temp: %.2f °C\n", humidity, temperature);
     Firebase.RTDB.setFloat(&fbdo, "/sensors/dht/humidity", humidity);
     Firebase.RTDB.setFloat(&fbdo, "/sensors/dht/temperature", temperature);
-  } else {
-    Serial.println("Failed to read from DHT sensor!");
   }
 
-  // === MQ-3 ALCOHOL SENSOR ===
+  // MQ-3 Alcohol Sensor
   int mq3Value = analogRead(MQ3_PIN);
   float alcoholPercentage = map(mq3Value, airValue, alcoholValue, 0, 100);
   alcoholPercentage = constrain(alcoholPercentage, 0, 100);
-  Serial.printf("MQ-3 Raw: %d | Alcohol %%: %.2f %%\n", mq3Value, alcoholPercentage);
   Firebase.RTDB.setFloat(&fbdo, "/sensors/alcohol/percentage", alcoholPercentage);
-  Firebase.RTDB.setInt(&fbdo, "/sensors/alcohol/raw", mq3Value);
 
-  // === ULTRASONIC SENSORS ===
+  // Ultrasonic Sensors
   for (int i = 0; i < numSensors; i++) {
     distances[i] = measureDistance(trigPins[i], echoPins[i]);
 
-    if (distances[i] >= 0) {
-      String path = "/sensors/ultrasonic/" + String(sensorKeys[i]) + "/status";
-      Serial.printf("%s: %.2f cm\n", sensorKeys[i], distances[i]);
+    String path = "/sensors/ultrasonic/" + String(sensorKeys[i]) + "/status";
+    if (distances[i] > 0) {
       Firebase.RTDB.setFloat(&fbdo, path.c_str(), distances[i]);
     } else {
-      Serial.printf("%s: Out of range\n", sensorKeys[i]);
+      Firebase.RTDB.setString(&fbdo, path.c_str(), "Out of range");
     }
   }
 
-  Serial.println("-----------------------------");
-  delay(2000);
 }

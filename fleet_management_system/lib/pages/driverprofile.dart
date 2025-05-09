@@ -18,6 +18,8 @@ class _DriverProfileState extends State<DriverProfile> {
   double? humidityThreshold;
   bool tempAlertShown = false;
   bool humidityAlertShown = false;
+  // Keep the flag for the smoke status alert
+  bool smokeStatusAlertShown = false;
 
   Completer<GoogleMapController> _controller = Completer();
   Set<Marker> _markers = {}; // Set to hold markers
@@ -38,8 +40,6 @@ class _DriverProfileState extends State<DriverProfile> {
     _gpsLocationSubscription?.cancel();
     super.dispose();
   }
-
-  // Modify the _listenToGpsLocation() method for better map updates
 
   void _listenToGpsLocation() {
     _gpsLocationSubscription = databaseRef.onValue.listen(
@@ -387,39 +387,44 @@ class _DriverProfileState extends State<DriverProfile> {
                               });
                             }
 
-                            // MQ135 Smoke Status
-                            final mq135RawValue = data['mq135']?['rawValue'];
-                            final mq135Status =
-                                mq135RawValue?.toString() ?? 'N/A';
+                            // MQ135 Smoke Status based on 'status' field
+                            final smokeData = data['smoke'];
+                            final smokeStatus =
+                                smokeData?['status']?.toString() ?? 'N/A';
+                            final smokeValue =
+                                smokeData?['value']?.toString() ??
+                                'N/A'; // Get the raw value as well
 
-                            final double? smokeValue = double.tryParse(
-                              mq135Status,
-                            );
-                            final bool isSmokeWarning =
-                                smokeValue != null &&
-                                smokeValue > 300; // Adjust threshold
+                            final isSmokeStatusDetected =
+                                smokeStatus == 'SM0KE DETECTED';
 
-                            // Show alert when smoke level is high
-                            if (isSmokeWarning) {
+                            // Show alert when smoke status is 'SM0KE DETECTED' and alert hasn't been shown
+                            if (isSmokeStatusDetected &&
+                                !smokeStatusAlertShown) {
+                              smokeStatusAlertShown = true; // Set flag
                               Future.microtask(() {
                                 showDialog(
                                   context: context,
                                   builder:
                                       (context) => AlertDialog(
-                                        title: const Text('Smoke Warning!'),
+                                        title: const Text('Smoke Detected!'),
                                         content: Text(
-                                          'High smoke levels detected! ($mq135Status)',
+                                          'Smoke detected! Status: $smokeStatus (Value: $smokeValue)',
                                         ),
                                         actions: [
                                           TextButton(
-                                            onPressed:
-                                                () => Navigator.pop(context),
+                                            onPressed: () {
+                                              Navigator.pop(context);
+                                            },
                                             child: const Text('OK'),
                                           ),
                                         ],
                                       ),
                                 );
                               });
+                            } else if (!isSmokeStatusDetected) {
+                              // Reset the flag when the status is no longer 'SM0KE DETECTED'
+                              smokeStatusAlertShown = false;
                             }
 
                             final vibrationCount =
@@ -468,14 +473,23 @@ class _DriverProfileState extends State<DriverProfile> {
                                   title: 'Fire Status',
                                   value: flameStatus,
                                   isDark: true,
+                                  isWarning:
+                                      isFlameDetected, // Indicate warning for flame
                                 ),
                                 _InfoCard(
-                                  title: 'Smoke Status',
-                                  value: mq135Status,
+                                  title:
+                                      'Smoke Status', // Displaying the status field
+                                  value: smokeStatus,
                                   isDark: true,
-                                  isWarning: isSmokeWarning,
+                                  isWarning:
+                                      isSmokeStatusDetected, // Use the status for warning
                                 ),
-
+                                _InfoCard(
+                                  title:
+                                      'Smoke Raw Value', // Optionally display the raw value as well
+                                  value: smokeValue,
+                                  isDark: true,
+                                ),
                                 _InfoCard(
                                   title: 'Vibration',
                                   value: vibrationCount,
@@ -505,14 +519,18 @@ class _DriverProfileState extends State<DriverProfile> {
                             );
                           },
                         ),
+                        // Positioned FAB for setting thresholds
                         Positioned(
                           bottom: 10,
                           right: 10,
                           child: FloatingActionButton(
                             onPressed: () {
-                              final tempController = TextEditingController();
-                              final humidityController =
-                                  TextEditingController();
+                              final tempController = TextEditingController(
+                                text: tempThreshold?.toString() ?? '',
+                              );
+                              final humidityController = TextEditingController(
+                                text: humidityThreshold?.toString() ?? '',
+                              );
 
                               showDialog(
                                 context: context,
@@ -671,7 +689,8 @@ class _InfoCard extends StatelessWidget {
               fontWeight: FontWeight.bold,
               color:
                   isWarning
-                      ? Colors.redAccent
+                      ? Colors
+                          .redAccent // Use red for warnings
                       : (isDark ? Colors.white : Colors.black),
             ),
           ),

@@ -5,8 +5,8 @@
 #include "addons/RTDBHelper.h"
 
 // ===== Wi-Fi Credentials =====
-#define WIFI_SSID "Home"
-#define WIFI_PASSWORD "Ravindu@6205"
+#define WIFI_SSID "Ravindu A70"
+#define WIFI_PASSWORD "Ravindu12345"
 
 // ===== Firebase Credentials =====
 #define API_KEY "AIzaSyD5lrh1dowrXxvuNs16PZ8tKmRBIcsFdvg"
@@ -19,7 +19,7 @@ FirebaseConfig config;
 
 // ===== Vibration Sensor Setup =====
 #define VIBRATION_PIN 33
-#define VIBRATION_THRESHOLD 1500
+#define VIBRATION_THRESHOLD 500
 int vibrationCount = 0;
 bool vibrationActive = false;
 
@@ -39,7 +39,7 @@ HardwareSerial GPSserial(2);
 
 // ===== MQ-135 Smoke Sensor Setup =====
 #define MQ135_PIN 32
-#define SMOKE_THRESHOLD 1500  // Adjust based on testing
+#define SMOKE_THRESHOLD 1200  // Adjust based on testing
 
 void setup() {
   Serial.begin(115200);
@@ -62,7 +62,7 @@ void setup() {
   Serial.print("🌐 Connecting to Wi-Fi");
   while (WiFi.status() != WL_CONNECTED) {
     Serial.print(".");
-    delay(500);
+    delay(10);
   }
   Serial.println("\n✅ Wi-Fi Connected");
 
@@ -172,5 +172,5 @@ void loop() {
   Serial.println(smokeStatus);
 
   Serial.println("-----------------------------");
-  delay(500);
+  delay(10);
 }

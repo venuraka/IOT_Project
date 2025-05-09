@@ -18,7 +18,6 @@ class _DriverProfileState extends State<DriverProfile> {
   double? humidityThreshold;
   bool tempAlertShown = false;
   bool humidityAlertShown = false;
-  // Keep the flag for the smoke status alert
   bool smokeStatusAlertShown = false;
 
   Completer<GoogleMapController> _controller = Completer();
@@ -364,8 +363,8 @@ class _DriverProfileState extends State<DriverProfile> {
                             final flameStatus =
                                 data['flame']?['status']?.toString() ?? 'N/A';
 
-                            final isFlameDetected =
-                                flameStatus.toLowerCase() == 'flame detected';
+                            final bool isFlameDetected =
+                                flameStatus.toLowerCase() == 'flame detected.';
 
                             if (isFlameDetected) {
                               Future.microtask(() {

@@ -257,7 +257,7 @@ class _DriverProfileState extends State<DriverProfile> {
                                 alcoholRaw != null &&
                                 double.tryParse(alcoholRaw.toString()) !=
                                     null &&
-                                double.parse(alcoholRaw.toString()) > 0.08;
+                                double.parse(alcoholRaw.toString()) > 100;
 
                             if (isAlcoholHigh) {
                               Future.microtask(() {

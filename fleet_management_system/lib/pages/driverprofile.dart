@@ -188,7 +188,7 @@ class _DriverProfileState extends State<DriverProfile> {
                                 value: ultrasonicFrontRight,
                                 isDark: true),
                             _InfoCard(
-                                title: 'FrontLeft Distance',
+                                title: 'BackRight Distance',
                                 value: ultrasonicBackRight,
                                 isDark: true),
                             

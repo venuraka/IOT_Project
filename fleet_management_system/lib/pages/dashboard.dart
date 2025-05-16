@@ -9,6 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:fleet_management_system/calculations/obd_calculations.dart';
 
 import 'package:firebase_database/firebase_database.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'login.dart';
 
@@ -29,12 +30,18 @@ class _DashboardState extends State<Dashboard> {
   String acceleration = "N/A";
   String deceleration = "N/A";
   String fuelConsumption = "N/A"; // Instant fuel rate
+  String totalFuelConsumption = "0.00 L"; // Total fuel consumption
 
   double? previousSpeed;
   DateTime? previousTime;
+  double _totalFuelUsed = 0.0; // Stores total fuel used in liters
+  double _lastFuelRate = 0.0; // Last recorded fuel rate in L/h
+  DateTime? _lastFuelUpdateTime; // Last time fuel rate was updated
+
   Timer? rpmTimer;
   Timer? speedTimer;
   Timer? fuelTimer;
+  Timer? totalFuelTimer; // Timer for updating total fuel consumption
   String? temporaryAlertMessage;
   Timer? alertTimer;
 
@@ -49,13 +56,36 @@ class _DashboardState extends State<Dashboard> {
   bool humidityAlertShown = false;
   bool smokeStatusAlertShown = false;
 
-  String obdDeviceAddress =
-      "01:23:45:67:89:BA"; // Replace with your ELM327 MAC address
+  String obdDeviceAddress = "01:23:45:67:89:BA";
 
   @override
   void initState() {
     super.initState();
+    _loadSavedFuelData();
     connectToOBDII();
+  }
+
+  // Load saved total fuel consumption
+  Future<void> _loadSavedFuelData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _totalFuelUsed = prefs.getDouble('totalFuelUsed') ?? 0.0;
+        totalFuelConsumption = "${_totalFuelUsed.toStringAsFixed(2)} L";
+      });
+    } catch (e) {
+      print("Error loading saved fuel data: $e");
+    }
+  }
+
+  // Save total fuel consumption
+  Future<void> _saveFuelData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('totalFuelUsed', _totalFuelUsed);
+    } catch (e) {
+      print("Error saving fuel data: $e");
+    }
   }
 
   Future<void> connectToOBDII() async {
@@ -65,18 +95,16 @@ class _DashboardState extends State<Dashboard> {
     });
 
     var statuses =
-        await [
-          Permission.bluetoothConnect,
-          Permission.bluetoothScan,
-          Permission.locationWhenInUse,
-        ].request();
+    await [
+      Permission.bluetoothConnect,
+      Permission.bluetoothScan,
+      Permission.locationWhenInUse,
+    ].request();
 
     if (statuses[Permission.bluetoothConnect] != PermissionStatus.granted ||
         statuses[Permission.bluetoothScan] != PermissionStatus.granted ||
         statuses[Permission.locationWhenInUse] != PermissionStatus.granted) {
-      setState(() {
-        isConnecting = false;
-      });
+      setState(() => isConnecting = false);
       showTemporaryAlert("Bluetooth or Location permissions denied!");
       return;
     }
@@ -112,13 +140,13 @@ class _DashboardState extends State<Dashboard> {
             startFuelConsumptionUpdates();
           })
           .catchError((error) {
-            setState(() {
-              responseText = "Connection failed!";
-              isConnecting = false;
-              isConnected = false;
-            });
-            print("Connection error: $error");
-          });
+        setState(() {
+          responseText = "Connection failed!";
+          isConnecting = false;
+          isConnected = false;
+        });
+        print("Connection error: $error");
+      });
     } catch (e) {
       setState(() {
         responseText = "Error: $e";
@@ -156,6 +184,48 @@ class _DashboardState extends State<Dashboard> {
       else
         t.cancel();
     });
+  }
+
+  // Start timer for updating total fuel consumption
+  void startTotalFuelCalculation() {
+    totalFuelTimer?.cancel();
+    _lastFuelUpdateTime = DateTime.now();
+    totalFuelTimer = Timer.periodic(const Duration(seconds: 5), (t) {
+      if (isConnected) {
+        _updateTotalFuelConsumption();
+      } else {
+        t.cancel();
+      }
+    });
+  }
+
+  // Calculate and update total fuel consumption
+  void _updateTotalFuelConsumption() {
+    if (_lastFuelUpdateTime == null || _lastFuelRate <= 0) return;
+
+    final now = DateTime.now();
+    final duration = now.difference(_lastFuelUpdateTime!).inMilliseconds / 3600000; // Convert to hours
+
+    // Calculate fuel used in this interval (L/h * h = L)
+    final fuelUsedInInterval = _lastFuelRate * duration;
+
+    setState(() {
+      _totalFuelUsed += fuelUsedInInterval;
+      totalFuelConsumption = "${_totalFuelUsed.toStringAsFixed(2)} L";
+    });
+
+    _lastFuelUpdateTime = now;
+    _saveFuelData(); // Save the updated total fuel consumption
+  }
+
+  // Reset total fuel consumption
+  void resetTotalFuelConsumption() {
+    setState(() {
+      _totalFuelUsed = 0.0;
+      totalFuelConsumption = "${_totalFuelUsed.toStringAsFixed(2)} L";
+    });
+    _saveFuelData();
+    showTemporaryAlert("Total fuel consumption reset");
   }
 
   void startListening() {
@@ -215,7 +285,13 @@ class _DashboardState extends State<Dashboard> {
       var A = int.parse(parts[2], radix: 16);
       var B = int.parse(parts[3], radix: 16);
       var rate = ((A * 256) + B) / 20.0;
-      setState(() => fuelConsumption = "${rate.toStringAsFixed(2)} L/h");
+      setState(() {
+        fuelConsumption = "${rate.toStringAsFixed(2)} L/h";
+        _lastFuelRate = rate;
+        if (_lastFuelUpdateTime == null) _lastFuelUpdateTime = DateTime.now();
+
+        print("fuel consumption: $fuelConsumption");
+      });
     } catch (_) {}
   }
 
@@ -243,25 +319,15 @@ class _DashboardState extends State<Dashboard> {
     return const Color.fromARGB(255, 15, 92, 239);
   }
 
-  double? _parseUltrasonicValue(dynamic value) {
-    if (value == null || value.toString() == 'Out of range') {
-      return null;
-    }
-
-    try {
-      return double.tryParse(value.toString());
-    } catch (_) {
-      return null;
-    }
-  }
-
   @override
   void dispose() {
     rpmTimer?.cancel();
     speedTimer?.cancel();
     fuelTimer?.cancel();
+    totalFuelTimer?.cancel();
     connection?.dispose();
     alertTimer?.cancel();
+    _saveFuelData(); // Save fuel data when disposing
     super.dispose();
   }
 
@@ -284,26 +350,29 @@ class _DashboardState extends State<Dashboard> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                // const SizedBox(width: 300), // Space between text and avatar
                 PopupMenuButton(
-                  onSelected: (value) {
-                    if (value == 'logout') {
+                  onSelected: (v) {
+                    if (v == 'logout')
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (context) => LoginScreen()),
+                        MaterialPageRoute(builder: (c) => LoginScreen()),
                       );
-                    }
+                    if (v == 'reset_fuel')
+                      resetTotalFuelConsumption();
                   },
-                  itemBuilder:
-                      (context) => [
-                        const PopupMenuItem(
-                          value: 'logout',
-                          child: Text('Logout'),
-                        ),
-                      ],
+                  itemBuilder: (c) => [
+                    const PopupMenuItem(
+                      value: 'logout',
+                      child: Text('Logout'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'reset_fuel',
+                      child: Text('Reset Fuel Consumption'),
+                    ),
+                  ],
                   child: const CircleAvatar(
                     radius: 18,
-                    backgroundImage: AssetImage('assets/images/profile.png'),
+                    backgroundImage: AssetImage("assets/images/profile.png"),
                   ),
                 ),
               ],
@@ -516,8 +585,8 @@ class _DashboardState extends State<Dashboard> {
                       ),
                     ),
                 _buildInfoBox(
-                  "Inst. Fuel",
-                  fuelConsumption,
+                  "Total Fuel",
+                  totalFuelConsumption,
                   width: 120,
                   color: const Color.fromARGB(255, 15, 92, 239),
                 ),

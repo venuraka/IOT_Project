@@ -18,7 +18,6 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<Dashboard> {
-
   BluetoothConnection? connection;
   bool isConnecting = true;
   bool isConnected = false;
@@ -27,20 +26,17 @@ class _DashboardState extends State<Dashboard> {
   String vehicleSpeed = "N/A";
   String acceleration = "N/A";
   String deceleration = "N/A";
+  String fuelConsumption = "N/A"; // Instant fuel rate
+
   double? previousSpeed;
   DateTime? previousTime;
   Timer? rpmTimer;
   Timer? speedTimer;
+  Timer? fuelTimer;
   String? temporaryAlertMessage;
   Timer? alertTimer;
 
-  double? frontDistance;
-  double? backDistance;
-  double? leftDistance;
-  double? rightDistance;
-
-  String obdDeviceAddress =
-      "01:23:45:67:89:BA"; // Replace with your ELM327 MAC address
+  String obdDeviceAddress = "01:23:45:67:89:BA";
 
   @override
   void initState() {
@@ -54,29 +50,25 @@ class _DashboardState extends State<Dashboard> {
       responseText = "Connecting...";
     });
 
-    Map<Permission, PermissionStatus> statuses =
-    await [
-      Permission.bluetoothConnect,
-      Permission.bluetoothScan,
-      Permission.locationWhenInUse,
-    ].request();
+    var statuses =
+        await [
+          Permission.bluetoothConnect,
+          Permission.bluetoothScan,
+          Permission.locationWhenInUse,
+        ].request();
 
     if (statuses[Permission.bluetoothConnect] != PermissionStatus.granted ||
         statuses[Permission.bluetoothScan] != PermissionStatus.granted ||
         statuses[Permission.locationWhenInUse] != PermissionStatus.granted) {
-      setState(() {
-        isConnecting = false;
-      });
+      setState(() => isConnecting = false);
       showTemporaryAlert("Bluetooth or Location permissions denied!");
       return;
     }
 
     try {
-      List<BluetoothDevice> devices =
-      await FlutterBluetoothSerial.instance.getBondedDevices();
-
-      BluetoothDevice? device = devices.firstWhere(
-            (d) => d.address == obdDeviceAddress,
+      var devices = await FlutterBluetoothSerial.instance.getBondedDevices();
+      var device = devices.firstWhere(
+        (d) => d.address == obdDeviceAddress,
         orElse: () => BluetoothDevice(address: "", name: ""),
       );
 
@@ -90,27 +82,27 @@ class _DashboardState extends State<Dashboard> {
       }
 
       BluetoothConnection.toAddress(device.address)
-          .then((_connection) {
-        setState(() {
-          connection = _connection;
-          isConnected = true;
-          isConnecting = false;
-        });
-        showTemporaryAlert("Connected to OBD device Successfully");
+          .then((_conn) {
+            setState(() {
+              connection = _conn;
+              isConnected = true;
+              isConnecting = false;
+            });
+            showTemporaryAlert("Connected to OBD device Successfully");
 
-        print("Connected to OBD-II");
-        startListening();
-        startRPMUpdates();
-        startSpeedUpdates();
-      })
+            startListening();
+            startRPMUpdates();
+            startSpeedUpdates();
+            startFuelConsumptionUpdates();
+          })
           .catchError((error) {
-        setState(() {
-          responseText = "Connection failed!";
-          isConnecting = false;
-          isConnected = false;
-        });
-        print("Connection error: $error");
-      });
+            setState(() {
+              responseText = "Connection failed!";
+              isConnecting = false;
+              isConnected = false;
+            });
+            print("Connection error: $error");
+          });
     } catch (e) {
       setState(() {
         responseText = "Error: $e";
@@ -122,164 +114,128 @@ class _DashboardState extends State<Dashboard> {
 
   void startRPMUpdates() {
     rpmTimer?.cancel();
-    rpmTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
-      if (isConnected) {
+    rpmTimer = Timer.periodic(const Duration(milliseconds: 100), (t) {
+      if (isConnected)
         sendOBDCommand("010C");
-      } else {
-        timer.cancel();
-      }
+      else
+        t.cancel();
     });
   }
 
   void startSpeedUpdates() {
     speedTimer?.cancel();
-    speedTimer = Timer.periodic(Duration(milliseconds: 50), (timer) {
-      if (isConnected) {
-        sendOBDCommand("010D"); // Speed PID
-      } else {
-        timer.cancel();
-      }
+    speedTimer = Timer.periodic(const Duration(milliseconds: 50), (t) {
+      if (isConnected)
+        sendOBDCommand("010D");
+      else
+        t.cancel();
+    });
+  }
+
+  void startFuelConsumptionUpdates() {
+    fuelTimer?.cancel();
+    fuelTimer = Timer.periodic(const Duration(milliseconds: 500), (t) {
+      if (isConnected)
+        sendOBDCommand("015E");
+      else
+        t.cancel();
     });
   }
 
   void startListening() {
     if (connection == null || !isConnected) return;
-
     connection!.input!.listen((Uint8List data) {
-      String rawResponse = utf8.decode(data);
-      print("Raw OBD Response: $rawResponse");
-
-      if (rawResponse.contains("41 0C")) {
-        parseEngineRPMResponse(rawResponse);
-      } else if (rawResponse.contains("41 0D")) {
-        parseSpeedResponse(rawResponse);
-      }
+      var raw = utf8.decode(data);
+      if (raw.contains("41 0C")) parseEngineRPMResponse(raw);
+      if (raw.contains("41 0D")) parseSpeedResponse(raw);
+      if (raw.contains("41 5E")) parseFuelConsumptionResponse(raw);
     });
   }
 
-  void sendOBDCommand(String command) async {
+  void sendOBDCommand(String cmd) async {
     if (connection == null || !isConnected) {
-      setState(() {
-        responseText = "Not connected to OBD-II device!";
-      });
+      setState(() => responseText = "Not connected to OBD-II device!");
       return;
     }
-
-    String formattedCommand = command + "\r";
-    connection!.output.add(Uint8List.fromList(utf8.encode(formattedCommand)));
+    var full = cmd + "\r";
+    connection!.output.add(Uint8List.fromList(utf8.encode(full)));
     await connection!.output.allSent;
   }
 
-  void parseEngineRPMResponse(String response) {
-    if (!response.contains("41 0C")) return;
-
-    List<String> hexValues = response.trim().split(" ");
-    if (hexValues.length < 4) return;
-
+  void parseEngineRPMResponse(String res) {
+    var parts = res.trim().split(' ');
+    if (parts.length < 4) return;
     try {
-      int rpmValue =
-          ((int.parse(hexValues[2], radix: 16) * 256) +
-              int.parse(hexValues[3], radix: 16)) ~/
-              4;
-
-      setState(() {
-        engineRPM = "$rpmValue RPM";
-      });
-    } catch (e) {
-      print("Error parsing RPM: $e");
-    }
+      var rpm =
+          ((int.parse(parts[2], radix: 16) * 256) +
+              int.parse(parts[3], radix: 16)) ~/
+          4;
+      setState(() => engineRPM = "$rpm RPM");
+    } catch (_) {}
   }
 
-  void parseSpeedResponse(String response) {
-    List<String> hexValues = response.trim().split(" ");
-    if (hexValues.length < 3) return;
-
+  void parseSpeedResponse(String res) {
+    var parts = res.trim().split(' ');
+    if (parts.length < 3) return;
     try {
-      int speedValue = int.parse(hexValues[2], radix: 16);
-      DateTime currentTime = DateTime.now();
-
-      // Instant deceleration detection
-      bool instantDeceleration = false;
-      if (previousSpeed != null && (previousSpeed! - speedValue) >= 10) {
-        instantDeceleration = true;
-      }
-
-      // Calculate acceleration and deceleration
-      double accelerationValue = calculateAcceleration(
-        previousSpeed,
-        speedValue.toDouble(),
-        previousTime,
-        currentTime,
-      );
-      double decelerationValue = calculateDeceleration(
-        previousSpeed,
-        speedValue.toDouble(),
-        previousTime,
-        currentTime,
-      );
-
-      // If instant deceleration detected, override calculated value
-      if (instantDeceleration) {
-        decelerationValue = (previousSpeed! - speedValue) /
-            currentTime.difference(previousTime!).inSeconds.clamp(1, 1000);
-      }
-
+      var sp = int.parse(parts[2], radix: 16).toDouble();
+      var now = DateTime.now();
+      var accVal = calculateAcceleration(previousSpeed, sp, previousTime, now);
+      var decVal = calculateDeceleration(previousSpeed, sp, previousTime, now);
       setState(() {
-        vehicleSpeed = "$speedValue km/h";
-        acceleration = "${accelerationValue.toStringAsFixed(2)} m/s²";
-        deceleration = "${decelerationValue.toStringAsFixed(2)} m/s²";
-        previousSpeed = speedValue.toDouble();
-        previousTime = currentTime;
+        vehicleSpeed = "${sp.toInt()} km/h";
+        acceleration = "${accVal.toStringAsFixed(2)} m/s²";
+        deceleration = "${decVal.toStringAsFixed(2)} m/s²";
+        previousSpeed = sp;
+        previousTime = now;
       });
-    } catch (e) {
-      print("Error parsing speed: $e");
-    }
+    } catch (_) {}
   }
-  void showTemporaryAlert(String message) {
-    setState(() {
-      temporaryAlertMessage = message;
-    });
 
-    alertTimer?.cancel(); // Cancel previous timer if running
+  void parseFuelConsumptionResponse(String res) {
+    var parts = res.trim().split(' ');
+    if (parts.length < 4) return;
+    try {
+      var A = int.parse(parts[2], radix: 16);
+      var B = int.parse(parts[3], radix: 16);
+      var rate = ((A * 256) + B) / 20.0;
+      setState(() => fuelConsumption = "${rate.toStringAsFixed(2)} L/h");
+    } catch (_) {}
+  }
+
+  void showTemporaryAlert(String msg) {
+    setState(() => temporaryAlertMessage = msg);
+    alertTimer?.cancel();
     alertTimer = Timer(const Duration(seconds: 5), () {
-      setState(() {
-        temporaryAlertMessage = null;
-      });
+      setState(() => temporaryAlertMessage = null);
     });
   }
 
   String _getDriverStatus() {
-    if (!isConnected) {
-      return "Disconnected";
-    }
-
-    double accValue = double.tryParse(acceleration.replaceAll(" m/s²", "")) ?? 0;
-    double decValue = double.tryParse(deceleration.replaceAll(" m/s²", "")) ?? 0;
-
-    if (accValue > 2.5) {
-      return "Accelerating: ${accValue.toStringAsFixed(2)} m/s²";
-    } else if (decValue > 1.5) {
-      return "Decelerating: ${decValue.toStringAsFixed(2)} m/s²";
-    } else {
-      return "Smooth Driving";
-    }
+    if (!isConnected) return "Disconnected";
+    var acc = double.tryParse(acceleration.replaceAll(" m/s²", "")) ?? 0;
+    var dec = double.tryParse(deceleration.replaceAll(" m/s²", "")) ?? 0;
+    if (acc > 2.5) return "Accelerating: ${acc.toStringAsFixed(2)} m/s²";
+    if (dec > 1.5) return "Decelerating: ${dec.toStringAsFixed(2)} m/s²";
+    return "Smooth Driving";
   }
 
-  Color _getDriverStatusColor(String value) {
-    if (value.contains("Accelerating")) return Colors.green;
-    if (value.contains("Decelerating")) return Colors.red;
-    if (value == "Disconnected") return Colors.grey;
-    return const Color.fromARGB(255, 15, 92, 239); // Default blue
+  Color _getDriverStatusColor(String v) {
+    if (v.contains("Accelerating")) return Colors.green;
+    if (v.contains("Decelerating")) return Colors.red;
+    if (v == "Disconnected") return Colors.grey;
+    return const Color.fromARGB(255, 15, 92, 239);
   }
+
   @override
   void dispose() {
     rpmTimer?.cancel();
+    speedTimer?.cancel();
+    fuelTimer?.cancel();
     connection?.dispose();
     alertTimer?.cancel();
-    connection?.dispose();
     super.dispose();
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -290,45 +246,37 @@ class _DashboardState extends State<Dashboard> {
         child: Column(
           children: [
             const SizedBox(height: 25),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Dashboard',
-                    style: GoogleFonts.poppins(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Dashboard',
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
                   ),
-                  // const SizedBox(width: 300), // Space between text and avatar
-                  PopupMenuButton(
-                    onSelected: (value) {
-                      if (value == 'logout') {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => LoginScreen(),
-                          ),
-                        );
-                      }
-                    },
-                    itemBuilder:
-                        (context) =>
-                    [
-                      const PopupMenuItem(
-                        value: 'logout',
-                        child: Text('Logout'),
-                      ),
-                    ],
-                    child: const CircleAvatar(
-                      radius: 18,
-                      backgroundImage: AssetImage("assets/images/profile.png"),
-                    ),
+                ),
+                PopupMenuButton(
+                  onSelected: (v) {
+                    if (v == 'logout')
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (c) => LoginScreen()),
+                      );
+                  },
+                  itemBuilder:
+                      (c) => [
+                        const PopupMenuItem(
+                          value: 'logout',
+                          child: Text('Logout'),
+                        ),
+                      ],
+                  child: const CircleAvatar(
+                    radius: 18,
+                    backgroundImage: AssetImage("assets/images/profile.png"),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
             const SizedBox(height: 30),
             Row(
@@ -343,30 +291,38 @@ class _DashboardState extends State<Dashboard> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildInfoBox("Speed", "$vehicleSpeed"),
-                _buildInfoBox("RPM", "$engineRPM"),
+                _buildInfoBox("Speed", vehicleSpeed),
+                _buildInfoBox("RPM", engineRPM),
+                _buildInfoBox("Fuel Rate", fuelConsumption),
               ],
             ),
-          const SizedBox(height: 15),
-          SizedBox(height: 15),
-            isConnected
-                ? _buildInfoBox(
-              "Driver Status",
-              _getDriverStatus(),
-              width: 120,
-              color: _getDriverStatusColor(_getDriverStatus()),
-            )
-                : GestureDetector(
-              onTap: () {
-                print("Driver Status Tapped - Reconnecting...");
-                connectToOBDII();
-              },
-              child: _buildInfoBox(
-                "Driver Status",
-                isConnecting ? "Reconnecting..." : "Disconnected",
-                width: 160,
-                color: Colors.grey,
-              ),
+            const SizedBox(height: 15),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                isConnected
+                    ? _buildInfoBox(
+                      "Driver Status",
+                      _getDriverStatus(),
+                      width: 120,
+                      color: _getDriverStatusColor(_getDriverStatus()),
+                    )
+                    : GestureDetector(
+                      onTap: connectToOBDII,
+                      child: _buildInfoBox(
+                        "Driver Status",
+                        isConnecting ? "Reconnecting..." : "Disconnected",
+                        width: 160,
+                        color: Colors.grey,
+                      ),
+                    ),
+                _buildInfoBox(
+                  "Inst. Fuel",
+                  fuelConsumption,
+                  width: 120,
+                  color: const Color.fromARGB(255, 15, 92, 239),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             const Text(
@@ -391,14 +347,13 @@ class _DashboardState extends State<Dashboard> {
             Expanded(
               child: Stack(
                 children: [
-                  // Positioned(top: 0, left: 80, child: _buildRadarArc()),
-                  // Positioned(top: 0, right: 80, child: _buildRadarArc()),
-                  // Positioned(bottom: -20, left: 80, child: _buildRadarArc()),
-                  // Positioned(bottom: -20, right: 80, child: _buildRadarArc()),
-                  Positioned(top: 0, left: 100, child: Transform.rotate(
-                    angle: 5.55,
-                    child: _buildRadarArc(),
-                  ),
+                  Positioned(
+                    top: 0,
+                    left: 100,
+                    child: Transform.rotate(
+                      angle: 5.55,
+                      child: _buildRadarArc(),
+                    ),
                   ),
                   Positioned(
                     top: 0,
@@ -424,7 +379,12 @@ class _DashboardState extends State<Dashboard> {
                       child: _buildRadarArc(),
                     ),
                   ),
-                  Center(child: Image.asset("assets/images/car.png", fit: BoxFit.contain)),
+                  Center(
+                    child: Image.asset(
+                      "assets/images/car.png",
+                      fit: BoxFit.contain,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -434,43 +394,12 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-
-  Widget _buildRadarArc() {
-    return CustomPaint(
-      size: Size(60, 60),
-      painter: RadarArcPainter(),
-    );
-  }
-}
-
-class RadarArcPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Paint arcPaint = Paint()
-      ..color = Colors.red.withOpacity(0.7)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3;
-
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
-
-    for (int i = 0; i < 3; i++) {
-      double currentRadius = radius * (0.5 + i * 0.3);
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: currentRadius),
-        3.5,
-        2.2,
-        false,
-        arcPaint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-  Widget _buildInfoBox(String title, String value,
-      {double width = 100, Color? color}) {
+  Widget _buildInfoBox(
+    String title,
+    String value, {
+    double width = 100,
+    Color? color,
+  }) {
     return Column(
       children: [
         Text(
@@ -482,7 +411,7 @@ class RadarArcPainter extends CustomPainter {
           width: width,
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: color ?? const Color.fromARGB(255, 15, 92, 239), // default
+            color: color ?? const Color.fromARGB(255, 15, 92, 239),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
@@ -498,3 +427,33 @@ class RadarArcPainter extends CustomPainter {
       ],
     );
   }
+
+  Widget _buildRadarArc() =>
+      CustomPaint(size: const Size(60, 60), painter: RadarArcPainter());
+}
+
+class RadarArcPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint =
+        Paint()
+          ..color = Colors.red.withOpacity(0.7)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3;
+    var center = Offset(size.width / 2, size.height / 2);
+    var radius = size.width / 2;
+    for (var i = 0; i < 3; i++) {
+      var r = radius * (0.5 + i * 0.3);
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: r),
+        3.5,
+        2.2,
+        false,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}

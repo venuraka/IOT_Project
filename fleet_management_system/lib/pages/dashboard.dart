@@ -8,6 +8,8 @@ import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:fleet_management_system/calculations/obd_calculations.dart';
 
+import 'package:firebase_database/firebase_database.dart';
+
 import 'login.dart';
 
 class Dashboard extends StatefulWidget {
@@ -36,7 +38,19 @@ class _DashboardState extends State<Dashboard> {
   String? temporaryAlertMessage;
   Timer? alertTimer;
 
-  String obdDeviceAddress = "01:23:45:67:89:BA";
+  double? frontDistance;
+  double? backDistance;
+  double? leftDistance;
+  double? rightDistance;
+
+  double? tempThreshold;
+  double? humidityThreshold;
+  bool tempAlertShown = false;
+  bool humidityAlertShown = false;
+  bool smokeStatusAlertShown = false;
+
+  String obdDeviceAddress =
+      "01:23:45:67:89:BA"; // Replace with your ELM327 MAC address
 
   @override
   void initState() {
@@ -60,7 +74,9 @@ class _DashboardState extends State<Dashboard> {
     if (statuses[Permission.bluetoothConnect] != PermissionStatus.granted ||
         statuses[Permission.bluetoothScan] != PermissionStatus.granted ||
         statuses[Permission.locationWhenInUse] != PermissionStatus.granted) {
-      setState(() => isConnecting = false);
+      setState(() {
+        isConnecting = false;
+      });
       showTemporaryAlert("Bluetooth or Location permissions denied!");
       return;
     }
@@ -256,16 +272,18 @@ class _DashboardState extends State<Dashboard> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                // const SizedBox(width: 300), // Space between text and avatar
                 PopupMenuButton(
-                  onSelected: (v) {
-                    if (v == 'logout')
+                  onSelected: (value) {
+                    if (value == 'logout') {
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (c) => LoginScreen()),
+                        MaterialPageRoute(builder: (context) => LoginScreen()),
                       );
+                    }
                   },
                   itemBuilder:
-                      (c) => [
+                      (context) => [
                         const PopupMenuItem(
                           value: 'logout',
                           child: Text('Logout'),
@@ -273,19 +291,199 @@ class _DashboardState extends State<Dashboard> {
                       ],
                   child: const CircleAvatar(
                     radius: 18,
-                    backgroundImage: AssetImage("assets/images/profile.png"),
+                    backgroundImage: AssetImage('assets/images/profile.png'),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 30),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildInfoBox("Vibration", "70Hz"),
-                _buildInfoBox("Temperature", "20 C"),
-                _buildInfoBox("Humidity", "77%"),
-              ],
+
+            StreamBuilder<DatabaseEvent>(
+              stream: FirebaseDatabase.instance.ref('sensors').onValue,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const Center(
+                    child: Text(
+                      'Error loading sensor data',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  );
+                }
+                // if (snapshot.connectionState ==
+                //     ConnectionState.waiting) {
+                //   return const Center(
+                //     child: CircularProgressIndicator(),
+                //   );
+                // }
+                final data =
+                    snapshot.data?.snapshot.value as Map<dynamic, dynamic>?;
+                if (data == null) {
+                  return const Center(
+                    child: Text(
+                      'No sensor data available',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  );
+                }
+
+                // Humidity and Temperature
+                final dhtHumidity =
+                    data['dht']?['humidity']?.toString() ?? 'N/A';
+                final dhtTemperature =
+                    data['dht']?['temperature']?.toString() ?? 'N/A';
+
+                final tempVal = double.tryParse(dhtTemperature);
+                final humidityVal = double.tryParse(dhtHumidity);
+
+                final isTempWarning =
+                    tempThreshold != null &&
+                    tempVal != null &&
+                    (tempVal > tempThreshold! ||
+                        tempVal < tempThreshold! - 5); // Check range
+
+                final isHumidityWarning =
+                    humidityThreshold != null &&
+                    humidityVal != null &&
+                    (humidityVal > humidityThreshold! ||
+                        humidityVal < humidityThreshold! - 5); // Check range
+
+                // Temperature Alert
+                if (isTempWarning && !tempAlertShown) {
+                  tempAlertShown = true;
+                  Future.microtask(() {
+                    showDialog(
+                      context: context,
+                      builder:
+                          (context) => AlertDialog(
+                            title: const Text('Temperature Warning!'),
+                            content: Text(
+                              'Temperature is out of safe range! (Set: ${tempThreshold}°C)',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('OK'),
+                              ),
+                            ],
+                          ),
+                    );
+                  });
+                } else if (!isTempWarning) {
+                  tempAlertShown = false;
+                }
+
+                // Humidity Alert
+                if (isHumidityWarning && !humidityAlertShown) {
+                  humidityAlertShown = true;
+                  Future.microtask(() {
+                    showDialog(
+                      context: context,
+                      builder:
+                          (context) => AlertDialog(
+                            title: const Text('Humidity Warning!'),
+                            content: Text(
+                              'Humidity is out of safe range! (Set: ${humidityThreshold}%)',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('OK'),
+                              ),
+                            ],
+                          ),
+                    );
+                  });
+                } else if (!isHumidityWarning) {
+                  humidityAlertShown = false;
+                }
+
+                final flameStatus =
+                    data['flame']?['status']?.toString() ?? 'N/A';
+
+                final bool isFlameDetected =
+                    flameStatus.toLowerCase() == 'flame detected.';
+
+                if (isFlameDetected) {
+                  Future.microtask(() {
+                    showDialog(
+                      context: context,
+                      builder:
+                          (context) => AlertDialog(
+                            title: const Text('Fire Warning!'),
+                            content: const Text(
+                              'Flame detected! Immediate action required!',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('OK'),
+                              ),
+                            ],
+                          ),
+                    );
+                  });
+                }
+
+                // MQ135 Smoke Status based on 'status' field
+                final smokeData = data['smoke'];
+                final smokeStatus = smokeData?['status']?.toString() ?? 'N/A';
+                final smokeValue =
+                    smokeData?['value']?.toString() ??
+                    'N/A'; // Get the raw value as well
+
+                final isSmokeStatusDetected = smokeStatus == 'SM0KE DETECTED';
+
+                // Show alert when smoke status is 'SM0KE DETECTED' and alert hasn't been shown
+                if (isSmokeStatusDetected && !smokeStatusAlertShown) {
+                  smokeStatusAlertShown = true; // Set flag
+                  Future.microtask(() {
+                    showDialog(
+                      context: context,
+                      builder:
+                          (context) => AlertDialog(
+                            title: const Text('Smoke Detected!'),
+                            content: Text(
+                              'Smoke detected! Status: $smokeStatus (Value: $smokeValue)',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                },
+                                child: const Text('OK'),
+                              ),
+                            ],
+                          ),
+                    );
+                  });
+                } else if (!isSmokeStatusDetected) {
+                  // Reset the flag when the status is no longer 'SM0KE DETECTED'
+                  smokeStatusAlertShown = false;
+                }
+
+                final vibrationCount =
+                    data['vibration']?['count']?.toString() ?? 'N/A';
+                final ultrasonicBackLeft =
+                    data['ultrasonic']?['backLeft']?['status']?.toString() ??
+                    'N/A';
+                final ultrasonicFrontLeft =
+                    data['ultrasonic']?['frontLeft']?['status']?.toString() ??
+                    'N/A';
+                final ultrasonicFrontRight =
+                    data['ultrasonic']?['frontRight']?['status']?.toString() ??
+                    'N/A';
+                final ultrasonicBackRight =
+                    data['ultrasonic']?['backRight']?['status']?.toString() ??
+                    'N/A';
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildInfoBox("Vibration", "${vibrationCount}Hz"),
+                    _buildInfoBox("Temperature", "${tempVal} C"),
+                    _buildInfoBox("Humidity", "${humidityVal}%"),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 15),
             Row(
@@ -394,66 +592,69 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-  Widget _buildInfoBox(
-    String title,
-    String value, {
-    double width = 100,
-    Color? color,
-  }) {
-    return Column(
-      children: [
-        Text(
-          title,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 5),
-        Container(
-          width: width,
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color ?? const Color.fromARGB(255, 15, 92, 239),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            value,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ],
-    );
+  Widget _buildRadarArc() {
+    return CustomPaint(size: Size(60, 60), painter: RadarArcPainter());
   }
-
-  Widget _buildRadarArc() =>
-      CustomPaint(size: const Size(60, 60), painter: RadarArcPainter());
 }
 
 class RadarArcPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint =
+    final Paint arcPaint =
         Paint()
           ..color = Colors.red.withOpacity(0.7)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 3;
-    var center = Offset(size.width / 2, size.height / 2);
-    var radius = size.width / 2;
-    for (var i = 0; i < 3; i++) {
-      var r = radius * (0.5 + i * 0.3);
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+
+    for (int i = 0; i < 3; i++) {
+      double currentRadius = radius * (0.5 + i * 0.3);
       canvas.drawArc(
-        Rect.fromCircle(center: center, radius: r),
+        Rect.fromCircle(center: center, radius: currentRadius),
         3.5,
         2.2,
         false,
-        paint,
+        arcPaint,
       );
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter old) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+Widget _buildInfoBox(
+  String title,
+  String value, {
+  double width = 100,
+  Color? color,
+}) {
+  return Column(
+    children: [
+      Text(
+        title,
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+      ),
+      const SizedBox(height: 5),
+      Container(
+        width: width,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: color ?? const Color.fromARGB(255, 15, 92, 239), // default
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          value,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    ],
+  );
 }

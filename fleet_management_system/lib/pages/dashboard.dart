@@ -38,10 +38,10 @@ class _DashboardState extends State<Dashboard> {
   String? temporaryAlertMessage;
   Timer? alertTimer;
 
-  double? frontDistance;
-  double? backDistance;
-  double? leftDistance;
-  double? rightDistance;
+  double? ultrasonicBackLeft;
+  double? ultrasonicFrontLeft;
+  double? ultrasonicFrontRight;
+  double? ultrasonicBackRight;
 
   double? tempThreshold;
   double? humidityThreshold;
@@ -241,6 +241,18 @@ class _DashboardState extends State<Dashboard> {
     if (v.contains("Decelerating")) return Colors.red;
     if (v == "Disconnected") return Colors.grey;
     return const Color.fromARGB(255, 15, 92, 239);
+  }
+
+  double? _parseUltrasonicValue(dynamic value) {
+    if (value == null || value.toString() == 'Out of range') {
+      return null;
+    }
+
+    try {
+      return double.tryParse(value.toString());
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
@@ -463,18 +475,7 @@ class _DashboardState extends State<Dashboard> {
 
                 final vibrationCount =
                     data['vibration']?['count']?.toString() ?? 'N/A';
-                final ultrasonicBackLeft =
-                    data['ultrasonic']?['backLeft']?['status']?.toString() ??
-                    'N/A';
-                final ultrasonicFrontLeft =
-                    data['ultrasonic']?['frontLeft']?['status']?.toString() ??
-                    'N/A';
-                final ultrasonicFrontRight =
-                    data['ultrasonic']?['frontRight']?['status']?.toString() ??
-                    'N/A';
-                final ultrasonicBackRight =
-                    data['ultrasonic']?['backRight']?['status']?.toString() ??
-                    'N/A';
+
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -543,47 +544,138 @@ class _DashboardState extends State<Dashboard> {
             ),
             const SizedBox(height: 30),
             Expanded(
-              child: Stack(
-                children: [
-                  Positioned(
-                    top: 0,
-                    left: 100,
-                    child: Transform.rotate(
-                      angle: 5.55,
-                      child: _buildRadarArc(),
-                    ),
-                  ),
-                  Positioned(
-                    top: 0,
-                    right: 100,
-                    child: Transform.rotate(
-                      angle: 1.00,
-                      child: _buildRadarArc(),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    left: 100,
-                    child: Transform.rotate(
-                      angle: 3.95,
-                      child: _buildRadarArc(),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 100,
-                    child: Transform.rotate(
-                      angle: 2.20,
-                      child: _buildRadarArc(),
-                    ),
-                  ),
-                  Center(
-                    child: Image.asset(
-                      "assets/images/car.png",
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ],
+              child: StreamBuilder<DatabaseEvent>(
+                stream: FirebaseDatabase.instance.ref('sensors').onValue,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return const Center(
+                      child: Text(
+                        'Error Loading Sonar Data',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    );
+                  }
+                  // if (snapshot.connectionState ==
+                  //     ConnectionState.waiting) {
+                  //   return const Center(
+                  //     child: CircularProgressIndicator(),
+                  //   );
+                  // }
+                  final data =
+                      snapshot.data?.snapshot.value as Map<dynamic, dynamic>?;
+                  if (data == null) {
+                    return const Center(
+                      child: Text(
+                        'No sensor data available',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    );
+                  }
+
+                  ultrasonicBackLeft = _parseUltrasonicValue(
+                    data['ultrasonic']?['backLeft']?['status'],
+                  );
+                  ultrasonicFrontLeft = _parseUltrasonicValue(
+                    data['ultrasonic']?['frontLeft']?['status'],
+                  );
+                  ultrasonicFrontRight = _parseUltrasonicValue(
+                    data['ultrasonic']?['frontRight']?['status'],
+                  );
+                  ultrasonicBackRight = _parseUltrasonicValue(
+                    data['ultrasonic']?['backRight']?['status'],
+                  );
+
+                  print("front right: $ultrasonicFrontRight");
+                  print("front left: $ultrasonicFrontLeft");
+                  print("back right: $ultrasonicBackRight");
+                  print("back left: $ultrasonicBackLeft");
+
+                  return Stack(
+                    children: [
+                      if (ultrasonicFrontLeft == null ||
+                          ultrasonicFrontLeft! >= 70.0)
+                        Positioned(
+                          top: 0,
+                          left: 100,
+                          child: Transform.rotate(angle: 5.55, child: null),
+                        ),
+
+                      if (ultrasonicFrontLeft != null &&
+                          ultrasonicFrontLeft! < 70)
+                        Positioned(
+                          top: 0,
+                          left: 100,
+                          child: Transform.rotate(
+                            angle: 5.55,
+                            child: _buildRadarArc(ultrasonicFrontLeft!),
+                          ),
+                        ),
+
+                      if (ultrasonicFrontRight == null ||
+                          ultrasonicFrontRight! >= 70.0)
+                        Positioned(
+                          top: 0,
+                          right: 100,
+                          child: Transform.rotate(angle: 1.00, child: null),
+                        ),
+
+                      if (ultrasonicFrontRight != null &&
+                          ultrasonicFrontRight! < 70)
+                        Positioned(
+                          top: 0,
+                          right: 100,
+                          child: Transform.rotate(
+                            angle: 1.00,
+                            child: _buildRadarArc(ultrasonicFrontRight!),
+                          ),
+                        ),
+
+                      if (ultrasonicBackLeft == null ||
+                          ultrasonicBackLeft! >= 70)
+                        Positioned(
+                          bottom: 0,
+                          left: 100,
+                          child: Transform.rotate(angle: 3.95, child: null),
+                        ),
+
+                      if (ultrasonicBackLeft != null &&
+                          ultrasonicBackLeft! < 70)
+                        Positioned(
+                          bottom: 0,
+                          left: 100,
+                          child: Transform.rotate(
+                            angle: 3.95,
+                            child: _buildRadarArc(ultrasonicBackLeft!),
+                          ),
+                        ),
+
+                      if (ultrasonicBackRight == null ||
+                          ultrasonicBackRight! >= 70)
+                        Positioned(
+                          bottom: 0,
+                          right: 100,
+                          child: Transform.rotate(angle: 2.20, child: null),
+                        ),
+
+                      if (ultrasonicBackRight != null &&
+                          ultrasonicBackRight! < 70)
+                        Positioned(
+                          bottom: 0,
+                          right: 100,
+                          child: Transform.rotate(
+                            angle: 2.20,
+                            child: _buildRadarArc(ultrasonicBackRight!),
+                          ),
+                        ),
+                      Center(
+                        child: Image.asset(
+                          "assets/images/car.png",
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ],
@@ -592,19 +684,38 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-  Widget _buildRadarArc() {
-    return CustomPaint(size: Size(60, 60), painter: RadarArcPainter());
+  Widget _buildRadarArc(double distance) {
+    return CustomPaint(size: Size(60, 60), painter: RadarArcPainter(distance));
   }
 }
 
 class RadarArcPainter extends CustomPainter {
+  final double distance;
+
+  RadarArcPainter(this.distance);
+
   @override
   void paint(Canvas canvas, Size size) {
-    final Paint arcPaint =
-        Paint()
-          ..color = Colors.red.withOpacity(0.7)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3;
+    Paint arcPaint;
+    if (distance < 10) {
+      arcPaint =
+          Paint()
+            ..color = Colors.red.withOpacity(0.7)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 3;
+    } else if (distance < 30) {
+      arcPaint =
+          Paint()
+            ..color = Colors.orange.withOpacity(0.7)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 3;
+    } else {
+      arcPaint =
+          Paint()
+            ..color = Colors.green.withOpacity(0.7)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 3;
+    }
 
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
